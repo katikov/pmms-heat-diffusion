@@ -82,8 +82,7 @@ void do_compute(const struct parameters *p, struct results *r)
         tmax = max(tmax, tinit[i]);
         sum += tinit[i];
     }
-    // maxdiff = fabs(tmin - tmax);
-    // tavg = sum/total;
+    tavg = sum/total;
     clock_t end = clock(); // time end
     time = (double)(end - begin) / CLOCKS_PER_SEC;
     ;
