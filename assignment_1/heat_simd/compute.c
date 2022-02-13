@@ -136,40 +136,46 @@ void do_compute(const struct parameters* p, struct results *r)
             double d1 = cur_world[(i-1)*num_cols+1] + cur_world[(i+1)*num_cols+1];
             //for(int j=1;j<=M;j++){
             for(int j=1;j<=M;j+=4){//*(__m256d *)
+
                 __m256d cur = _mm256_loadu_pd(&cur_world[i*num_cols+j]);
                 __m256d cond = _mm256_loadu_pd(&conductivity[(i-1)*M+j-1]);
-
                 __m256d sum = _mm256_mul_pd(cur,cond);
-                //cur_world[i*num_cols+j] * conductivity[(i-1)*M+j-1]
+
                 __m256d up = _mm256_loadu_pd(&cur_world[(i-1)*num_cols+j+1]);
                 __m256d down = _mm256_loadu_pd(&cur_world[(i+1)*num_cols+j+1]);
                 __m256d sum_ud = _mm256_add_pd(up,down);
-
-                __m256d left = _mm256_set_pd(d0,d1,sum_ud[0],sum_ud[1]);
+                __m256d left = _mm256_set_pd(sum_ud[1],sum_ud[0],d1,d0);
                 __m256d sum_diag = _mm256_add_pd(left, sum_ud);
                 sum_diag = _mm256_mul_pd(sum_diag, _mm256_loadu_pd(&weight_diag[(i-1)*M+j-1]));
 
+                sum = _mm256_add_pd(sum, sum_diag);
+
                 __m256d sum_direct_l = _mm256_loadu_pd(&cur_world[i*num_cols+j-1]);
                 __m256d sum_direct_r = _mm256_loadu_pd(&cur_world[i*num_cols+j+1]);
-                __m256d sum_direct_ud = _mm256_set_pd(d1,sum_ud[0],sum_ud[1],sum_ud[2]);
                 __m256d sum_direct_lr = _mm256_add_pd(sum_direct_l, sum_direct_r);
+                __m256d sum_direct_ud = _mm256_set_pd(sum_ud[2],sum_ud[1],sum_ud[0],d1);
                 __m256d sum_direct = _mm256_add_pd(sum_direct_lr, sum_direct_ud);
-                sum_direct = _mm256_mul_pd(sum_diag, _mm256_loadu_pd(&weight_direct[(i-1)*M+j-1]));
+                sum_direct = _mm256_mul_pd(sum_direct, _mm256_loadu_pd(&weight_direct[(i-1)*M+j-1]));
 
-                sum = _mm256_add_pd(sum, sum_diag);
+                //cur_world[i*num_cols+j] * conductivity[(i-1)*M+j-1]
                 sum = _mm256_add_pd(sum, sum_direct);
                 _mm256_storeu_pd(&next_world[i*num_cols+j],sum);
-                
-
-                __m256d diff = _mm256_sub_pd(sum, cur);
-                double absdiff = fabs(diff[0]); 
-                maxdiff = (maxdiff>=absdiff)?maxdiff:absdiff;
-                absdiff = fabs(diff[1]); 
-                maxdiff = (maxdiff>=absdiff)?maxdiff:absdiff;
-                absdiff = fabs(diff[2]); 
-                maxdiff = (maxdiff>=absdiff)?maxdiff:absdiff;
-                absdiff = fabs(diff[3]); 
-                maxdiff = (maxdiff>=absdiff)?maxdiff:absdiff;
+                // for(int a=0;a<4;a++){
+                //     if(sum[a]<40){
+                //         printf("%d %d %d %lf\n",i,j,a,sum[a]);
+                //         printf("%lf %lf %lf %lf\n", sum_diag[a], sum_direct[a], cur[a], cond[a]);
+                //         die("error");
+                //     }
+                // }
+                // __m256d diff = _mm256_sub_pd(sum, cur);
+                // double absdiff = fabs(diff[0]); 
+                // maxdiff = (maxdiff>=absdiff)?maxdiff:absdiff;
+                // absdiff = fabs(diff[1]); 
+                // maxdiff = (maxdiff>=absdiff)?maxdiff:absdiff;
+                // absdiff = fabs(diff[2]); 
+                // maxdiff = (maxdiff>=absdiff)?maxdiff:absdiff;
+                // absdiff = fabs(diff[3]); 
+                // maxdiff = (maxdiff>=absdiff)?maxdiff:absdiff;
 
                 //double d3 = cur_world[(i-1)*num_cols+j+1] + cur_world[(i+1)*num_cols+j+1];
                 // double temp = cur_world[i*num_cols+j] * conductivity[(i-1)*M+j-1]
@@ -182,6 +188,10 @@ void do_compute(const struct parameters* p, struct results *r)
                 // double diff = (temp - cur_world[i*num_cols+j]);
                 // maxdiff = (maxdiff>diff)?maxdiff:diff;
                 // next_world[i*num_cols+j] = temp;
+            }
+            for(int j=1;j<=M;j++){
+                double diff = fabs(cur_world[(i-1)*num_cols+j]-next_world[(i-1)*num_cols+j]);
+                maxdiff = (maxdiff>=diff)?maxdiff:diff;
             }
         }
 
