@@ -264,6 +264,8 @@ void do_compute(const struct parameters* p, struct results *r)
                 sum = _mm_fmadd_pd(sum_direct, _mm_loadu_pd(&weight_direct[(i-1)*M+j-1]),sum);
 
                 _mm_storeu_pd(&next_world[i*num_cols+j],sum);
+                d0 = sum_ud[0];
+                d1 = sum_ud[1];
 
                 //d0 = sum_ud[2];
                 //d1 = sum_ud[3];
