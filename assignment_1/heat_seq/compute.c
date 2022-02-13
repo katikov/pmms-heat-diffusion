@@ -48,7 +48,8 @@ void do_compute(const struct parameters *p, struct results *r)
     const double *conductivity = p->conductivity;
 
     // calculate temperature
-    clock_t begin = clock(); // time begin
+    struct timespec start_time;
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
     double *tmp;
     row = p->M, col = p->N;
     double *_tinit = (double *)malloc(row * col * sizeof(double));
@@ -82,10 +83,10 @@ void do_compute(const struct parameters *p, struct results *r)
         tmax = max(tmax, tinit[i]);
         sum += tinit[i];
     }
-    tavg = sum/total;
-    clock_t end = clock(); // time end
-    time = (double)(end - begin) / CLOCKS_PER_SEC;
-    ;
+    tavg = sum / total;
+    struct timespec now_time;
+    clock_gettime(CLOCK_MONOTONIC, &now_time);
+    
 
     // end of calculation, save results
     r->niter = _iter;
@@ -93,7 +94,8 @@ void do_compute(const struct parameters *p, struct results *r)
     r->tmax = tmax;
     r->maxdiff = maxdiff;
     r->tavg = tavg;
-    r->time = time;
+    r->time = now_time.tv_sec - start_time.tv_sec 
+        + 1e-9*(now_time.tv_nsec - start_time.tv_nsec);;
 
     free(_tinit);
 }
