@@ -2,165 +2,87 @@
 #include <math.h>
 #include <stdlib.h>
 #include "compute.h"
-#include "fail.h"
+#define max(a,b) ((a) > (b) ? (a) : (b))
+#define min(a,b) ((a) < (b) ? (a) : (b))
 
+int row, col, _iter;
 
-static inline void get_result(const struct parameters* p, const double* world, struct results *r, struct timespec start_time){
-    //tavg, tmax, tmin, time
-    //double maxdiff = 0;
-    double tsum = 0;
-    double tmax = p->io_tmin;
-    double tmin = p->io_tmax;
-
-    int N = p->M, M = p->N;
-    for(int i=1;i<=N;i++){
-        for(int j=1;j<=M;j++){
-            double temp = world[i*(M+2)+j];
-            //double temp_old = old_world[i*(M+2)+j];
-            tsum += temp;
-            if(temp>tmax)tmax = temp;
-            if(temp<tmin)tmin = temp;
-            //double diff = fabs(temp - temp_old);
-            //if(diff>maxdiff)maxdiff = diff;
-        }
-    }
-    struct timespec now_time;
-    clock_gettime(CLOCK_MONOTONIC, &now_time);
-    r->time = now_time.tv_sec - start_time.tv_sec 
-        + 1e-9*(now_time.tv_nsec - start_time.tv_nsec);
-    //r->maxdiff = maxdiff; 
-    r->tmax = tmax;
-    r->tmin = tmin;
-    r->tavg = tsum / (N*M);
+double calculate_t(int r, int c, const double* tinit, const double* conductivity) {
+    int index = r*row + c;
+    if (r==0 || r==row-1) return tinit[index]; // boundry points
+    if ((r==1 || r==row-2) && _iter > 0) return tinit[index]; // halo grid points
     
-}
-
-static inline double get_maxdiff(const struct parameters* p, const double* world, const double* old_world){
-    double maxdiff = 0;
-    int N = p->M, M = p->N;
-
-    for(int i=1;i<=N;i++){
-        for(int j=1;j<=M;j++){
-            double temp = world[i*(M+2)+j];
-            double temp_old = old_world[i*(M+2)+j];
-            double diff = fabs(temp - temp_old);
-            maxdiff = (maxdiff>diff)?maxdiff:diff;
-        }
-    }
-    return maxdiff;
+    // calculate conductivity coefficients
+    double remainting_c = 1 - conductivity[index];
+    double direct_n_c = remainting_c * sqrt(2) / (sqrt(2) + 1) / 4;
+    double diagnol_n_c = remainting_c / (sqrt(2) + 1) / 4;
     
-}
+    // calculate neighbors location
+    int u_index = (r - 1)*row + c;
+    int d_index = (r + 1)*row + c;
+    int l_index = r*row + c - 1;
+    int r_index = r*row + c + 1;
+    int lu_index = (r - 1)*row + c - 1;
+    int ru_index = (r - 1)*row + c + 1;
+    int ld_index = (r + 1)*row + c - 1;
+    int rd_index = (r + 1)*row + c + 1;
 
-static void draw_picture(const struct parameters* p, const double* world, size_t key){
-    int N = p->N, M = p->M;
-    begin_picture(key, M, N, p->io_tmin, p->io_tmax);
-    for(int i=1;i<=N;i++){
-        for(int j=1;j<=M;j++){
-            draw_point(j-1,i-1,world[j*(N+2)+i]);
-        }
-    }
-    end_picture();
-
+    // calculate current grid point temperature
+    double res = conductivity[index] * tinit[index] + 
+        direct_n_c * (tinit[u_index] + tinit[d_index] + tinit[l_index] + tinit[r_index]) +
+        diagnol_n_c * (tinit[lu_index] + tinit[ru_index] + tinit[ld_index] + tinit[rd_index]);
+    
+    return res;
 }
 
 void do_compute(const struct parameters* p, struct results *r)
 {
-    int N = p->N;
-    int M = p->M;
-    const double weight_diag = 1/(sqrt(2)+1)/4;
-    const double weight_direct = sqrt(2)/(sqrt(2)+1)/4;
-    double* cur_world;
-    double* next_world;
-    double* conductivity;
+    double tmin = p->io_tmax + 1, tmax = p->io_tmin - 1, tavg, time;
+    double maxdiff = abs(tmin - tmax);
+    size_t iter = p->maxiter;
 
-    if (!(conductivity = calloc((N) * (M), sizeof(double)))) die("calloc");
-    for(int i=0;i<N;i++)for(int j=0;j<M;j++){
-        conductivity[j*N+i] = p->conductivity[i*M+j];
-    }
+    const double* tinit = p->tinit;
+    const double* conductivity = p->conductivity;
 
-    
-    if (!(cur_world = calloc((N+2) * (M+2), sizeof(double)))) die("calloc");
-    if (!(next_world = calloc((N+2) * (M+2), sizeof(double)))) die("calloc");
-    
-    // TODO: transpose the matrix
-    for(int j=0;j<p->M;j++){
-        cur_world[(j+1)*(p->N + 2)] = p->tinit[j];
-        next_world[(j+1)*(p->N + 2)] = p->tinit[j];
-
-        cur_world[(j+2)*(p->N + 2)-1] = p->tinit[(p->N-1)*(p->M)+j];
-        next_world[(j+2)*(p->N + 2)-1] = p->tinit[(p->N-1)*(p->M)+j];
-    }
-    cur_world[0] = next_world[0] = cur_world[(p->M)*(p->N + 2)];
-    cur_world[(p->M+1)*(p->N + 2)] = next_world[(p->M+1)*(p->N + 2)] = cur_world[(p->N + 2)];
-    cur_world[p->N + 1] = next_world[p->N + 1] = cur_world[(p->M + 1)*(p->N + 2)-1];
-    cur_world[(p->M + 2)*(p->N + 2)-1] = next_world[(p->M + 2)*(p->N + 2)-1] = cur_world[2*(p->N + 2)-1];
-    for(int i=0;i<p->N;i++){
-        for(int j=0;j<p->M;j++){
-            cur_world[(j+1)*(p->N+2) + i + 1] = p->tinit[i*p->M + j];              
-        }
-    }
-
-    // for(int j=0;j<M;j++){
-    //     cur_world[j+1] = p->tinit[j];
-    //     next_world[j+1] = p->tinit[j];
-
-    //     cur_world[(N+1)*(M + 2) + j+1] = p->tinit[(N-1)*M+j];
-    //     next_world[(N+1)*(M + 2)+ j+1] = p->tinit[(N-1)*M+j];
-    // }
-    // cur_world[0] = next_world[0] = cur_world[M];
-    // cur_world[M + 1] = next_world[M + 1] = cur_world[1];
-    
-    // cur_world[(N+1)*(M + 2)] = next_world[(N+1)*(M + 2)] = cur_world[(N+2)*(M+2)-2];
-    // cur_world[(N+2)*(M+2)-1] = next_world[(N+2)*(M+2)-1] = cur_world[(N+1)*(M+2)+1];
-
-    // for(int i=0;i<N;i++){
-    //     for(int j=0;j<M;j++){
-    //         cur_world[(i+1)*(M+2) + j + 1] = p->tinit[i*M + j];              
-    //     }
-    // }
-    struct timespec start_time;
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
-    
-
-    for(int iter=0; iter<p->maxiter; iter++){
-        double maxdiff = get_maxdiff(p,cur_world, next_world);
-        r->maxdiff = maxdiff;
-        if(maxdiff < p->threshold){
-            break;
-        }
-        if(p->printreports && iter%(p->period)==0 && iter){
-            get_result(p, cur_world, r, start_time);
-            report_results(p,r);
-        }
-        for(int i=1;i<=N;i++){
-            // cur_world[i*(M+2)] = cur_world[(i+1)*(M+2)-2];
-            // cur_world[(i+1)*(M+2)-1] = cur_world[i*(M+2)+1];
-            cur_world[i] = cur_world[M*(N+2)+i];
-            cur_world[(M+1)*(N+2)+i] = cur_world[(N+2)+i];
-        }
-
-        for(int i=1;i<=M;i++){
-            for(int j=1;j<=N;j++){
-                next_world[i*(N+2)+j] = cur_world[i*(N+2)+j] * conductivity[(i-1)*N+j-1]
-                    + (     (cur_world[(i-1)*(N+2)+j-1] + cur_world[(i-1)*(N+2)+j+1] 
-                            + cur_world[(i+1)*(N+2)+j-1] + cur_world[(i+1)*(N+2)+j+1])*weight_diag
-                        +   (cur_world[(i-1)*(N+2)+j] + cur_world[i*(N+2)+j-1]
-                            + cur_world[i*(N+2)+j+1] + cur_world[(i+1)*(N+2)+j])*weight_direct
-                    ) 
-                    * (1-conductivity[(i-1)*N+j-1]);
+    // calculate temperature
+    clock_t begin = clock(); // time begin
+    double* tmp;
+    row = p->M, col = p->N;
+    double* _tinit = (double*)malloc(row * col * sizeof(double));
+    for(_iter = 0; _iter < iter; _iter++) {
+        // interate maxiter times
+        // check convergence needed...
+        for(size_t r = 0; r < row; r++) {
+            for(size_t c = 0; c < col; c++) {
+                int index = r*row + c;
+                _tinit[index] = calculate_t(r, c, tinit, conductivity);
             }
         }
-
-        double* temp_world = cur_world;
-        cur_world = next_world;
-        next_world = temp_world;
-
-        r->niter = iter + 1;
+        tmp = tinit;
+        tinit = _tinit;
+        _tinit = tmp;
     }
-    
-    r->maxdiff = get_maxdiff(p,cur_world, next_world);
-    get_result(p, cur_world, r, start_time);
-    
-    // export pgm file
-    //draw_picture(p, cur_world, 1);
+
+    // calculate characteristic values
+    int total = row * col;
+    double sum = 0.0;
+    for(size_t i = 0; i < total; i++) {
+        tmin = min(tmin, tinit[i]);
+        tmax = max(tmax, tinit[i]);
+        sum += tinit[i];
+    }
+    maxdiff = abs(tmin - tmax);
+    tavg = sum/total;
+    clock_t end = clock(); // time end
+    time = (double)(end - begin) / CLOCKS_PER_SEC;;
+
+    // end of calculation, save results
+    r->niter = _iter;
+    r->tmin = tmin;
+    r->tmax = tmax;
+    r->maxdiff = maxdiff;
+    r->tavg = tavg;
+    r->time = time;
+
+    free(_tinit);
 }
