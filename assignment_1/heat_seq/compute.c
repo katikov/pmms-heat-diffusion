@@ -1,101 +1,136 @@
 #include <time.h>
 #include <math.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include "compute.h"
+
 #define max(a, b) ((a) > (b) ? (a) : (b))
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
-int row, col, _iter;
-
-inline double calculate_t(int r, int c, const double *tinit, const double *conductivity)
+int row, col;
+double direct_n_c;
+double diagnol_n_c;
+static inline double calculate_diff(int r, int c, const double *tinit, double *new_tinit, const double *conductivity)
 {
-    int index = r * row + c;
-    if (r == 0 || r == row - 1)
-        return tinit[index]; // boundry points
-    if ((r == 1 || r == row - 2) && _iter > 0)
-        return tinit[index]; // halo grid points
+    int old_index = r * row + c;
+    int new_index = r * (col + 2) + (c + 1);
 
-    // calculate conductivity coefficients
-    double remainting_c = 1 - conductivity[index];
-    double direct_n_c = remainting_c * sqrt(2) / (sqrt(2) + 1) / 4;
-    double diagnol_n_c = remainting_c / (sqrt(2) + 1) / 4;
-
-    // calculate neighbors location
-    int u_index = (r - 1) * row + c;
-    int d_index = (r + 1) * row + c;
-    int l_index = r * row + c - 1;
-    int r_index = r * row + c + 1;
-    int lu_index = (r - 1) * row + c - 1;
-    int ru_index = (r - 1) * row + c + 1;
-    int ld_index = (r + 1) * row + c - 1;
-    int rd_index = (r + 1) * row + c + 1;
+    int u_index = new_index - (col + 2);
+    int d_index = new_index + (col + 2);
+    int l_index = new_index - 1;
+    int r_index = new_index + 1;
+    int lu_index = u_index - 1;
+    int ru_index = ru_index + 1;
+    int ld_index = d_index - 1;
+    int rd_index = d_index + 1;
 
     // calculate current grid point temperature
-    double res = conductivity[index] * tinit[index] +
-                 direct_n_c * (tinit[u_index] + tinit[d_index] + tinit[l_index] + tinit[r_index]) +
-                 diagnol_n_c * (tinit[lu_index] + tinit[ru_index] + tinit[ld_index] + tinit[rd_index]);
+    double remainting_c = 1 - conductivity[old_index];
+    double old_temperature = tinit[new_index];
+    double new_temperature = conductivity[old_index] * tinit[new_index] +
+                             remainting_c * direct_n_c * (tinit[u_index] + tinit[d_index] + tinit[l_index] + tinit[r_index]) +
+                             remainting_c * diagnol_n_c * (tinit[lu_index] + tinit[ru_index] + tinit[ld_index] + tinit[rd_index]);
 
-    return res;
+    new_tinit[new_index] = new_temperature;
+    double *tmp = new_tinit;
+    new_tinit = tinit;
+    tinit = tmp;
+
+    return fabs(old_temperature - new_temperature);
 }
 
 void do_compute(const struct parameters *p, struct results *r)
 {
-    double tmin = p->io_tmax + 1, tmax = p->io_tmin - 1, tavg, time;
-    double maxdiff = fabs(tmin - tmax);
-    size_t iter = p->maxiter;
-
+    // initialization
+    row = p->N;
+    col = p->M;
     const double *tinit = p->tinit;
-    const double *conductivity = p->conductivity;
-
-    // calculate temperature
-    struct timespec start_time;
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
-    double *tmp;
-    row = p->M, col = p->N;
-    double *_tinit = (double *)malloc(row * col * sizeof(double));
-    int flag = 0;
-    for (_iter = 0; _iter < iter && flag == 1; _iter++)
+    double tmin = p->io_tmax + 1, tmax = p->io_tmin - 1, tavg, time;
+    size_t iter = p->maxiter;
+    size_t threshold = p->threshold;
+    double *conductivity = p->conductivity;
+    double *_tinit = (double *)malloc((row + 2) * (col + 2) * sizeof(double));
+    double *new_tinit = (double *)malloc((row + 2) * (col + 2) * sizeof(double));
+    double *tmp_ptr;
+    struct timespec start, end;
+    direct_n_c = sqrt(2) / (sqrt(2) + 1) / 4;
+    diagnol_n_c = 1 / (sqrt(2) + 1) / 4;
+    // first initailize the actual matrix
+    _tinit = _tinit + col + 2;
+    new_tinit = new_tinit + col + 2;
+    for (int i = 0; i < row; i++)
     {
-        // interate maxiter times
-        // check convergence needed...
+        int current_row = i * col;
+        for (int j = 1; j < col + 2; j++)
+        {
+            int index = current_row + j;
+            _tinit[index] = p->tinit[index];
+        }
+        _tinit[current_row + 0] = p->tinit[current_row + col - 1];
+        _tinit[current_row + col + 1] = p->tinit[current_row];
+    }
+    // second1 initialize halo grid
+    for (int j = 0; j < col + 2; j++)
+    {
+        _tinit[-1 * col + j] = _tinit[j];
+        _tinit[row * col + j] = _tinit[(row - 1) * col + j];
+
+        new_tinit[-1 * col + j] = _tinit[j];
+        new_tinit[row * col + j] = _tinit[(row - 1) * col + j];
+    }
+
+    // iterator parameters
+    bool terminate = false;
+    double maxdiff = 0;
+    clock_gettime(CLOCK_MONOTONIC, &start); /* time begin */
+
+    for (int _iter = 0; _iter < iter; _iter++)
+    {
+        if (terminate)
+            break; // check convergence
+
         for (size_t r = 0; r < row; r++)
         {
             for (size_t c = 0; c < col; c++)
             {
-                int index = r * row + c;
-                double res = _tinit[index] = calculate_t(r, c, tinit, conductivity);
-                if (fabs(res - tinit[index]) > p->threshold)
-                    flag = 1;
+                double diff = calculate_diff(r, c, _tinit, new_tinit, conductivity);
+                maxdiff = max(maxdiff, diff);
+
+                if (maxdiff > p->threshold)
+                {
+                    terminate = false;
+                }
             }
         }
-
-        tmp = tinit;
-        tinit = _tinit;
-        _tinit = tmp;
     }
 
     // calculate characteristic values
     int total = row * col;
     double sum = 0.0;
-    for (size_t i = 0; i < total; i++)
+    int idx;
+    for (int i = 0; i < row; i++)
     {
-        tmin = min(tmin, tinit[i]);
-        tmax = max(tmax, tinit[i]);
-        sum += tinit[i];
+        for (int j = 0; j < col; j++)
+        {
+            idx = (i + 1) * (col + 2) + (j + 1);
+            tmin = min(tmin, tinit[idx]);
+            tmax = max(tmax, tinit[idx]);
+            sum += tinit[idx];
+        }
     }
     tavg = sum / total;
-    struct timespec now_time;
-    clock_gettime(CLOCK_MONOTONIC, &now_time);
-    
+
+    clock_gettime(CLOCK_MONOTONIC, &end); /* time end */
+    time = end.tv_sec - start.tv_sec + 1e-9 * (end.tv_nsec - start.tv_nsec);
 
     // end of calculation, save results
-    r->niter = _iter;
+    r->niter = iter;
     r->tmin = tmin;
     r->tmax = tmax;
     r->maxdiff = maxdiff;
     r->tavg = tavg;
-    r->time = now_time.tv_sec - start_time.tv_sec 
-        + 1e-9*(now_time.tv_nsec - start_time.tv_nsec);;
+    r->time = time;
 
-    free(_tinit);
+    // draw_picture(p, tinit, 1);
+    // free(tinit);
 }
