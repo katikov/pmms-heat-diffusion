@@ -275,7 +275,7 @@ void do_compute(const struct parameters* p, struct results *r)
                 double diff = fabs(cur_world[(i-1)*num_cols+j]-next_world[(i-1)*num_cols+j]);
                 maxdiff = (maxdiff>=diff)?maxdiff:diff;
                 diff = fabs(cur_world[(i-1)*num_cols+j+1]-next_world[(i-1)*num_cols+j+1]);
-                maxdiff = (maxdiff>=diff)?maxdiff:diff;
+                maxdiff = (j<M && maxdiff>=diff)?maxdiff:diff;
             }
             // for(int j=1;j<=M;j++){
             //     double diff = fabs(cur_world[(i-1)*num_cols+j]-next_world[(i-1)*num_cols+j]);
