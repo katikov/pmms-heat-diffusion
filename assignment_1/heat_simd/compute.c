@@ -194,7 +194,7 @@ void do_compute(const struct parameters* p, struct results *r)
                 maxdiff = (maxdiff>=diff)?maxdiff:diff;
                 d0=d1;d1=d2;
             }
-            for(int k=0;k<4;k++) maxdiff = (maxdiff>=maxdiff_vec[i])?maxdiff:maxdiff_vec[i];
+            for(int k=0;k<4;k++) maxdiff = (maxdiff>=maxdiff_vec[k])?maxdiff:maxdiff_vec[k];
         }
 
         double* temp_world = cur_world;
