@@ -125,7 +125,7 @@ void do_compute(const struct parameters* p, struct results *r)
                     ;
                 d1 = d2;
                 d2 = d3;
-                double diff = (temp - cur_world[i*(M+2)+j]);
+                double diff = fabs(temp - cur_world[i*(M+2)+j]);
                 maxdiff = (maxdiff>diff)?maxdiff:diff;
                 next_world[i*(M+2)+j] = temp;
             }
