@@ -114,6 +114,7 @@ void do_compute(const struct parameters* p, struct results *r)
             break;
         }
         maxdiff=0;
+        maxdiff_vec = _mm256_set1_pd(0.0);
         if(p->printreports && iter%(p->period)==0 && iter){
             get_result(p, cur_world, r, start_time);
             report_results(p,r);
