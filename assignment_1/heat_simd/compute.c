@@ -165,6 +165,12 @@ void do_compute(const struct parameters* p, struct results *r)
                 next_world[i*num_cols+j+2] = temp2;
                 next_world[i*num_cols+j+3] = temp3;
 
+                temp0 = fabs(temp0-cur_world[i*num_cols+j]);
+                temp1 = fabs(temp1-cur_world[i*num_cols+j+1]);
+                temp2 = fabs(temp2-cur_world[i*num_cols+j+2]);
+                temp3 = fabs(temp3-cur_world[i*num_cols+j+3]);
+
+
                 maxdiff = (maxdiff >= temp0)? maxdiff:temp0;
                 maxdiff = (maxdiff >= temp1)? maxdiff:temp1;
                 maxdiff = (maxdiff >= temp2)? maxdiff:temp2;
