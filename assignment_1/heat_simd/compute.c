@@ -133,27 +133,44 @@ void do_compute(const struct parameters* p, struct results *r)
             for(j=1;j<=M-3;j+=4){
 
                 // vectorize with flags -ftree-vectorize
-                /*
-                double d2 = cur_world[(i-1)*(M+2)+j+1] + cur_world[(i+1)*(M+2)+j+1];
-                double d3 = cur_world[(i-1)*(M+2)+j+2] + cur_world[(i+1)*(M+2)+j+2];
+/*                
+                double d2 = cur_world[(i-1)*num_cols+j+1] + cur_world[(i+1)*num_cols+j+1];
+                double d3 = cur_world[(i-1)*num_cols+j+2] + cur_world[(i+1)*num_cols+j+2];
+                double d4 = cur_world[(i-1)*num_cols+j+3] + cur_world[(i+1)*num_cols+j+3];
+                double d5 = cur_world[(i-1)*num_cols+j+4] + cur_world[(i+1)*num_cols+j+4];
 
 
-                double temp0 = cur_world[i*(M+2)+j] * conductivity[(i-1)*M+j-1]
+                double temp0 = cur_world[i*num_cols+j] * conductivity[(i-1)*M+j-1]
                     +    (d0+d2)*weight_diag[(i-1)*M+j-1]
-                    +   (d1 + cur_world[i*(M+2)+j-1] + cur_world[i*(M+2)+j+1])*weight_direct[(i-1)*M+j-1]
+                    +   (d1 + cur_world[i*num_cols+j-1] + cur_world[i*num_cols+j+1])*weight_direct[(i-1)*M+j-1]
                     ;
-                double temp1 = cur_world[i*(M+2)+j+1] * conductivity[(i-1)*M+j]
+                double temp1 = cur_world[i*num_cols+j+1] * conductivity[(i-1)*M+j]
                     +    (d1+d3)*weight_diag[(i-1)*M+j]
-                    +   (d2 + cur_world[i*(M+2)+j] + cur_world[i*(M+2)+j+2])*weight_direct[(i-1)*M+j]
+                    +   (d2 + cur_world[i*num_cols+j] + cur_world[i*num_cols+j+2])*weight_direct[(i-1)*M+j]
+                    ;
+                double temp2 = cur_world[i*num_cols+j+2] * conductivity[(i-1)*M+j+1]
+                    +    (d2+d4)*weight_diag[(i-1)*M+j+1]
+                    +   (d3 + cur_world[i*num_cols+j+1] + cur_world[i*num_cols+j+3])*weight_direct[(i-1)*M+j+1]
+                    ;
+                double temp3 = cur_world[i*num_cols+j+3] * conductivity[(i-1)*M+j+2]
+                    +    (d3+d5)*weight_diag[(i-1)*M+j+2]
+                    +   (d4 + cur_world[i*num_cols+j+2] + cur_world[i*num_cols+j+4])*weight_direct[(i-1)*M+j+2]
                     ;
 
-                d0 = d2;
-                d1 = d3;
+                d0 = d4;
+                d1 = d5;
 
-                next_world[i*(M+2)+j] = temp0;
-                next_world[i*(M+2)+j+1] = temp1;
-            */
+                next_world[i*num_cols+j] = temp0;
+                next_world[i*num_cols+j+1] = temp1;
+                next_world[i*num_cols+j+2] = temp2;
+                next_world[i*num_cols+j+3] = temp3;
 
+                maxdiff = (maxdiff >= temp0)? maxdiff:temp0;
+                maxdiff = (maxdiff >= temp1)? maxdiff:temp1;
+                maxdiff = (maxdiff >= temp2)? maxdiff:temp2;
+                maxdiff = (maxdiff >= temp3)? maxdiff:temp3;
+            
+*/
                 __m256d cur = _mm256_loadu_pd(&cur_world[i*num_cols+j]);
                 __m256d cond = _mm256_loadu_pd(&conductivity[(i-1)*M+j-1]);
                 __m256d sum = _mm256_mul_pd(cur,cond);
@@ -182,6 +199,7 @@ void do_compute(const struct parameters* p, struct results *r)
                 __m256d diff_vec2 = _mm256_sub_pd(sum,cur);
                 __m256d diff_vec = _mm256_max_pd(diff_vec1,diff_vec2);
                 maxdiff_vec = _mm256_max_pd(maxdiff_vec, diff_vec);
+                
             }
             
             for(;j<=M;j++){
