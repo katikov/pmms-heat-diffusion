@@ -26,21 +26,17 @@ void top_down_mergesort(int *b, long l, int *a){
     for(int k = 0; k < l; k++) {
         if (i < num_lhs && (j >= num_rhs || b[i] <= mid_b[j])) {
             a[k] = b[i];
-            i = i + 1;
+            i++;
         } else {
             a[k] = mid_b[j];
-            j = j + 1;
+            j++;
         }
     }
 
 }
 /* Sort vector v of l elements using mergesort */
-void msort(int *v, long l){
-    int *b = (int*)malloc(l*sizeof(int));
-    if(b == NULL) {
-        fprintf(stderr, "Malloc failed...\n");
-        exit(-1);
-    }
+void msort(int *v, long l, int *b){
+
     memcpy(b,v,l*sizeof(int));
     top_down_mergesort(b,l,v);
 }
@@ -168,13 +164,19 @@ int main(int argc, char **argv) {
     if(debug) {
         print_v(vector, length);
     }
+    int *b = (int*)malloc(length*sizeof(int));
+    if(b == NULL) {
+        fprintf(stderr, "Malloc failed...\n");
+        exit(-1);
+    }
 
     clock_gettime(CLOCK_MONOTONIC, &before);
 
     /* Sort */
-    msort(vector, length);
+    msort(vector, length, b);
 
     clock_gettime(CLOCK_MONOTONIC, &after);
+    free(b);
     double time = (double)(after.tv_sec - before.tv_sec) +
                   (double)(after.tv_nsec - before.tv_nsec) / 1e9;
 
