@@ -5,16 +5,74 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <omp.h>
+#include <memory.h>
 
 /* Ordering of the vector */
 typedef enum Ordering {ASCENDING, DESCENDING, RANDOM} Order;
 
 int debug = 0;
 
-/* Sort vector v of l elements using mergesort */
-void msort(int *v, long l){
+void top_down_mergesort(int *b, long l, int *a){
+    if(l<=1)
+        return;
+    int num_rhs = l/2;
+    int num_lhs = l-num_rhs;
+    int *mid_a = a+num_lhs;
+    int *mid_b = b+num_lhs;
+    top_down_mergesort(a, num_lhs, b);
+    top_down_mergesort(mid_a, num_rhs, mid_b);
+    int i=0,j=0;
+
+    for(int k = 0; k < l; k++) {
+        if (i < num_lhs && (j >= num_rhs || b[i] <= mid_b[j])) {
+            a[k] = b[i];
+            i = i + 1;
+        } else {
+            a[k] = mid_b[j];
+            j = j + 1;
+        }
+    }
 
 }
+/* Sort vector v of l elements using mergesort */
+void msort(int *v, long l){
+    int *b = (int*)malloc(l*sizeof(int));
+    if(b == NULL) {
+        fprintf(stderr, "Malloc failed...\n");
+        exit(-1);
+    }
+    memcpy(b,v,l*sizeof(int));
+    top_down_mergesort(b,l,v);
+}
+/*
+
+
+//  Left source half is A[ iBegin:iMiddle-1].
+// Right source half is A[iMiddle:iEnd-1   ].
+// Result is            B[ iBegin:iEnd-1   ].
+void TopDownMerge(A[], iBegin, iMiddle, iEnd, B[])
+{
+    i = iBegin, j = iMiddle;
+ 
+    // While there are elements in the left or right runs...
+    for (k = iBegin; k < iEnd; k++) {
+        // If left run head exists and is <= existing right run head.
+        if (i < iMiddle && (j >= iEnd || A[i] <= A[j])) {
+            B[k] = A[i];
+            i = i + 1;
+        } else {
+            B[k] = A[j];
+            j = j + 1;
+        }
+    }
+}
+
+void CopyArray(A[], iBegin, iEnd, B[])
+{
+    for (k = iBegin; k < iEnd; k++)
+        B[k] = A[k];
+}
+*/
 
 void print_v(int *v, long l) {
     printf("\n");
