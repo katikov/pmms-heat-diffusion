@@ -62,6 +62,7 @@ void vecsort(int **vector_vectors, int *vector_lengths, long length_outer)
             exit(-1);
         }
         msort(vector_vectors[i], vector_lengths[i], b);
+        free(b);
     }
 }
 
