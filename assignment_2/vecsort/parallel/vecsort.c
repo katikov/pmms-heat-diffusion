@@ -79,7 +79,7 @@ void top_down_mergesort_parallel(int *b, long l, int *a)
 void vecsort(int **vector_vectors, int *vector_lengths, long length_outer)
 {
 // TODO: Just Do It. Don't let your dreams be dreams.
-#pragma omp parallel for shared(vector_lenghts)
+#pragma omp parallel for shared(vector_lengths)
     {
         for (int i = 0; i < length_outer; i++)
         {
@@ -89,10 +89,11 @@ void vecsort(int **vector_vectors, int *vector_lengths, long length_outer)
                 fprintf(stderr, "Malloc failed...\n");
                 exit(-1);
             }
-            for (int j = 0; j < vector_lengths[i]; j++)
-            {
-                b[j] = vector_vectors[i][j];
-            }
+            // for (int j = 0; j < vector_lengths[i]; j++)
+            // {
+            //     b[j] = vector_vectors[i][j];
+            // }
+            memcpy(b,vector_vectors[i],vector_lengths[i]*sizeof(int));
 #pragma omp single
             {
                 top_down_mergesort_parallel(b, vector_lengths[i], vector_vectors[i]);
