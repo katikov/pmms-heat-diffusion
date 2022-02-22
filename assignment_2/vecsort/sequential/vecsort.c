@@ -6,14 +6,47 @@
 #include <ctype.h>
 #include <omp.h>
 #include <assert.h>
+#include <memory.h>
+
 
 /* Ordering of the vector */
 typedef enum Ordering {ASCENDING, DESCENDING, RANDOM} Order;
 
 int debug = 0;
 
-void vecsort(/* ...  */){
-    //TODO: Just Do It. Don't let your dreams be dreams.
+void top_down_mergesort(int *b, long l, int *a){
+    if(l<=1)
+        return;
+    int num_rhs = l/2;
+    int num_lhs = l-num_rhs;
+    int *mid_a = a+num_lhs;
+    int *mid_b = b+num_lhs;
+    top_down_mergesort(a, num_lhs, b);
+    top_down_mergesort(mid_a, num_rhs, mid_b);
+    int i=0,j=0;
+
+    for(int k = 0; k < l; k++) {
+        if (i < num_lhs && (j >= num_rhs || b[i] <= mid_b[j])) {
+            a[k] = b[i];
+            i++;
+        } else {
+            a[k] = mid_b[j];
+            j++;
+        }
+    }
+
+}
+/* Sort vector v of l elements using mergesort */
+void vecsort(int **vector_vectors, int *vector_lengths, long length_outer){
+
+    int *b;
+
+    for(long i = 0; i < length_outer; i++) {
+        b = (int*)malloc(sizeof(int)*vector_lengths[i]);
+        memcpy(b,vector_vectors[i],vector_lengths[i]*sizeof(int));
+        top_down_mergesort(b, vector_lengths[i], vector_vectors[i]);
+        free(b);
+    }
 }
 
 void print_v(int **vector_vectors, int *vector_lengths, long length_outer) {
@@ -136,13 +169,13 @@ int main(int argc, char **argv) {
     clock_gettime(CLOCK_MONOTONIC, &before);
 
     /* Sort */
-    vecsort(/* ... */);
+    vecsort(vector_vectors, vector_lengths, length_outer);
 
     clock_gettime(CLOCK_MONOTONIC, &after);
     double time = (double)(after.tv_sec - before.tv_sec) +
               (double)(after.tv_nsec - before.tv_nsec) / 1e9;
 
-    printf("Vecsort took: % .6e \n", time);
+    printf("Vecsort took: % .6e seconds \n", time);
 
     if(debug) {
         print_v(vector_vectors, vector_lengths, length_outer);
