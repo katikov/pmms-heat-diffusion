@@ -95,7 +95,7 @@ void vecsort(int **vector_vectors, int *vector_lengths, long length_outer)
             }
 #pragma omp single
             {
-                top_down_mergesort_parallel(b, l, vector_vectors[i]);
+                top_down_mergesort_parallel(b, vector_lengths[i], vector_vectors[i]);
             }
         }
     }
