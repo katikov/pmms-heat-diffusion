@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include <stdbool.h>
 #include <omp.h>
 #define max(a,b) (a)>=(b)?(a):(b)
 #define min(a,b) (a)<=(b)?(a):(b)
@@ -40,11 +41,12 @@ void top_down_mergesort(int *b, long l, int *a){
     merge(a, b, mid_b, num_lhs, num_rhs, l);
 }
 
-const int static threshold = 1024;
-void top_down_mergesort_parallel(int *b, long l, int *a){
+//int threshold = 2048;
+const int threshold = 2048;
+void top_down_mergesort_parallel(int *b, long l, int *a, bool flag){
     if(l<=threshold) {
-        // if(flag) memcpy(a,b,l*sizeof(int));
-        // else memcpy(b,a,l*sizeof(int));
+        if(flag) memcpy(a,b,l*sizeof(int));
+        else memcpy(b,a,l*sizeof(int));
         top_down_mergesort(b,l,a);
         return;    
     }else{
@@ -54,11 +56,11 @@ void top_down_mergesort_parallel(int *b, long l, int *a){
         int *mid_b = b+num_lhs;
         #pragma omp task
         {
-            top_down_mergesort_parallel(a, num_lhs, b);
+            top_down_mergesort_parallel(a, num_lhs, b, !flag);
         }
         #pragma omp task
         {
-            top_down_mergesort_parallel(mid_a, num_rhs, mid_b);
+            top_down_mergesort_parallel(mid_a, num_rhs, mid_b, !flag);
         }
         #pragma omp taskwait
         merge(a, b, mid_b, num_lhs, num_rhs, l);
@@ -71,17 +73,19 @@ void top_down_mergesort_parallel(int *b, long l, int *a){
 void msort(int *v, long l, int *b){
 
     //memcpy(b,v,l*sizeof(int));
-    int copy_threads = min(4,num_threads);
+    /*
+    int copy_threads = num_threads;
     #pragma omp parallel for num_threads(copy_threads) if(num_threads>1)
     for(int i=0;i<l;i++){
         b[i]=v[i];
     }
+    */
     #pragma omp parallel
     {
         #pragma omp single
         {
             //if(debug)
-            top_down_mergesort_parallel(b,l,v);
+            top_down_mergesort_parallel(b,l,v,0);
         }
         
     }
@@ -114,6 +118,9 @@ int main(int argc, char **argv) {
     /* Read command-line options. */
     while((c = getopt(argc, argv, "adrgp:l:s:")) != -1) {
         switch(c) {
+            case 't':
+                //threshold = atol(optarg);
+                break;
             case 'a':
                 order = ASCENDING;
                 break;
