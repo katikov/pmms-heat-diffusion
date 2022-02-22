@@ -6,14 +6,85 @@
 #include <ctype.h>
 #include <omp.h>
 #include <assert.h>
+#include <string.h>
+#define max(a,b) (a)>=(b)?(a):(b)
+#define min(a,b) (a)<=(b)?(a):(b)
 
 /* Ordering of the vector */
 typedef enum Ordering {ASCENDING, DESCENDING, RANDOM} Order;
 
 int debug = 0;
+int num_threads = 1;
 
-void vecsort(/* ...  */){
-    //TODO: Just Do It. Don't let your dreams be dreams.
+void top_down_mergesort(int *b, long l, int *a){
+    if(l<=1)
+        return;
+    int num_rhs = l/2;
+    int num_lhs = l-num_rhs;
+    int *mid_a = a+num_lhs;
+    int *mid_b = b+num_lhs;
+    top_down_mergesort(a, num_lhs, b);
+    top_down_mergesort(mid_a, num_rhs, mid_b);
+    int i=0,j=0;
+
+    for(int k = 0; k < l; k++) {
+        if (i < num_lhs && (j >= num_rhs || b[i] <= mid_b[j])) {
+            a[k] = b[i];
+            i++;
+        } else {
+            a[k] = mid_b[j];
+            j++;
+        }
+    }
+}
+
+const int static threshold = 1024;
+void top_down_mergesort_parallel(int *b, long l, int *a){
+    if(l<=threshold) {
+        top_down_mergesort(b, l ,a);
+    }else{
+
+        int num_rhs = l/2;
+        int num_lhs = l-num_rhs;
+        int *mid_a = a+num_lhs;
+        int *mid_b = b+num_lhs;
+        #pragma omp task
+        {
+            top_down_mergesort_parallel(a, num_lhs, b);
+        }
+        #pragma omp task
+        {
+            top_down_mergesort_parallel(mid_a, num_rhs, mid_b);
+        }
+        
+        #pragma omp taskwait
+        int i=0,j=0;
+        for(int k = 0; k < l; k++) {
+            if (i < num_lhs && (j >= num_rhs || b[i] <= mid_b[j])) {
+                a[k] = b[i];
+                i++;
+            } else {
+                a[k] = mid_b[j];
+                j++;
+            }
+        }
+    }
+}
+/* Sort vector v of l elements using mergesort */
+void vecsort(int **vector_vectors, int *vector_lengths, long length_outer){
+
+    int *b;
+    int copy_threads = min(4,num_threads);
+    #pragma omp parallel for schedule(guided) num_threads(copy_threads)// assume using 32 threads, 4 threads are used in for loop
+    for(long i = 0; i < length_outer; i++) {
+        b = (int*)malloc(sizeof(int)*vector_lengths[i]);
+        memcpy(b,vector_vectors[i],vector_lengths[i]*sizeof(int));
+        // #pragma omp single
+        {
+            top_down_mergesort(b, vector_lengths[i], vector_vectors[i]);
+        }
+        free(b);
+    }
 }
 
 void print_v(int **vector_vectors, int *vector_lengths, long length_outer) {
@@ -35,7 +106,6 @@ int main(int argc, char **argv) {
     int c;
     int seed = 42;
     long length_outer = 1e4;
-    int num_threads = 1;
     Order order = ASCENDING;
     int length_inner_min = 100;
     int length_inner_max = 1000;
@@ -136,7 +206,7 @@ int main(int argc, char **argv) {
     clock_gettime(CLOCK_MONOTONIC, &before);
 
     /* Sort */
-    vecsort(/* ... */);
+    vecsort(vector_vectors, vector_lengths, length_outer);
 
     clock_gettime(CLOCK_MONOTONIC, &after);
     double time = (double)(after.tv_sec - before.tv_sec) +
@@ -151,3 +221,9 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+/*
+export OMP_PROC_BIND=true
+export OMP_WAIT_POLICY=active
+export OMP_NUM_THREADS=32
+export OMP_PLACES=cores
+*/
