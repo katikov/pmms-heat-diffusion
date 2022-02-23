@@ -13,8 +13,15 @@
 /* Ordering of the vector */
 typedef enum Ordering {ASCENDING, DESCENDING, RANDOM} Order;
 
+/*
+    num_threads    task_threads    calculation time
+    2              6               1.00116026 sec
+    4              6               0.58464072 sec
+    4              7               0.5737095  sec
+*/
 int debug = 0;
-int num_threads = 1;
+int num_threads = 2;
+int task_threads = 7;
 
 void top_down_mergesort(int *b, long l, int *a){
     if(l<=1)
@@ -38,26 +45,25 @@ void top_down_mergesort(int *b, long l, int *a){
     }
 }
 
-const int static threshold = 1024;
+const int static threshold = 1000;
 void top_down_mergesort_parallel(int *b, long l, int *a){
     if(l<=threshold) {
         top_down_mergesort(b, l ,a);
     }else{
-
         int num_rhs = l/2;
         int num_lhs = l-num_rhs;
         int *mid_a = a+num_lhs;
         int *mid_b = b+num_lhs;
-        #pragma omp task
+#pragma omp task
         {
             top_down_mergesort_parallel(a, num_lhs, b);
         }
-        #pragma omp task
+#pragma omp task
         {
             top_down_mergesort_parallel(mid_a, num_rhs, mid_b);
         }
         
-        #pragma omp taskwait
+#pragma omp taskwait
         int i=0,j=0;
         for(int k = 0; k < l; k++) {
             if (i < num_lhs && (j >= num_rhs || b[i] <= mid_b[j])) {
@@ -75,15 +81,24 @@ void vecsort(int **vector_vectors, int *vector_lengths, long length_outer){
 
     int *b;
     int copy_threads = min(4,num_threads);
-    #pragma omp parallel for schedule(guided) num_threads(copy_threads)// assume using 32 threads, 4 threads are used in for loop
-    for(long i = 0; i < length_outer; i++) {
-        b = (int*)malloc(sizeof(int)*vector_lengths[i]);
-        memcpy(b,vector_vectors[i],vector_lengths[i]*sizeof(int));
-        // #pragma omp single
-        {
-            top_down_mergesort(b, vector_lengths[i], vector_vectors[i]);
+
+    omp_set_nested(1);
+
+#pragma omp parallel num_threads(copy_threads) // alloc 4 threads as main threads at most
+    {
+#pragma omp for
+        for(long i = 0; i < length_outer; i++) {
+            b = (int*)malloc(sizeof(int)*vector_lengths[i]);
+            memcpy(b,vector_vectors[i],vector_lengths[i]*sizeof(int));
+#pragma omp parallel num_threads(task_threads) // alloc 6 threads for task theads to split vector
+            {
+#pragma omp single // sort 1 vector with 1 thread
+                {
+                    top_down_mergesort_parallel(b, vector_lengths[i], vector_vectors[i]);
+                    free(b);
+                };
+            }
         }
-        free(b);
     }
 }
 

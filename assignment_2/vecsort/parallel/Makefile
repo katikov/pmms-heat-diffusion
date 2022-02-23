@@ -6,10 +6,10 @@ OBJ=$(patsubst %.c,%.o,$(SRC))
 CC=gcc
 INCLUDES=-I../../include
 ifndef DEBUG
-CFLAGS=-O2 -std=gnu99
+CFLAGS=-O2 -std=gnu99 -fopenmp
 LIB=
 else
-CFLAGS=-O0 -g3 -std=gnu99
+CFLAGS=-O0 -g3 -std=gnu99 -fopenmp
 LIB=
 endif
 
@@ -20,6 +20,9 @@ $(PRJ): $(OBJ)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@ $(LIB)	
+
+test: test.c
+	$(CC) $(CFLAGS) -o test $<
 
 clean:
 	-rm -f $(OBJ) $(PRJ)
