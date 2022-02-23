@@ -41,8 +41,8 @@ void top_down_mergesort(int *b, long l, int *a){
     merge(a, b, mid_b, num_lhs, num_rhs, l);
 }
 
-//int threshold = 2048;
-const int threshold = 8192;
+int threshold = 4096;
+//const int threshold = 8192;
 
 int inline binary_search(int *a, int len, int r){
     int L=0,R=len-1;
@@ -167,7 +167,7 @@ int main(int argc, char **argv) {
     while((c = getopt(argc, argv, "adrgp:l:s:")) != -1) {
         switch(c) {
             case 't':
-                //threshold = atol(optarg);
+                threshold = atol(optarg);
                 break;
             case 'a':
                 order = ASCENDING;
