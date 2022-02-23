@@ -42,7 +42,54 @@ void top_down_mergesort(int *b, long l, int *a){
 }
 
 //int threshold = 2048;
-const int threshold = 2048;
+const int threshold = 8192;
+
+int inline binary_search(int *a, int len, int r){
+    int L=0,R=len-1;
+    int ans=0;
+    while(L<=R){
+        int mid = (L+R)/2;
+        if(a[mid]<=r){
+            ans=mid+1;
+            L=mid+1;
+        }else{
+            R=mid-1;
+        }
+    }
+    return ans;
+}
+
+void merge_parallel(int *a, int *b, int *c, int num_lhs, int num_rhs){
+    int l = num_lhs + num_rhs;
+    if(l<=threshold){
+        merge(a,b,c,num_lhs,num_rhs,l);
+        return;
+    }
+    if(num_lhs<num_rhs){
+        int* temp=b;
+        b=c;
+        c=temp;
+        int t=num_lhs;
+        num_lhs=num_rhs;
+        num_rhs=t;
+    }
+    int rb = num_lhs/2;
+    int rc = binary_search(c,num_rhs,b[rb-1]);
+    //printf("%d %d\n",rb,rc);
+    a[rb+rc-1] = b[rb-1];
+    #pragma omp task
+    {
+        merge_parallel(a,b,c,rb-1,rc);
+    }
+    #pragma omp task
+    {
+        merge_parallel(a+rb+rc,b+rb,c+rc,num_lhs-rb,num_rhs-rc);
+    }
+    #pragma omp taskwait
+
+
+}
+
 void top_down_mergesort_parallel(int *b, long l, int *a, bool flag){
     if(l<=threshold) {
         if(flag) memcpy(a,b,l*sizeof(int));
@@ -63,7 +110,8 @@ void top_down_mergesort_parallel(int *b, long l, int *a, bool flag){
             top_down_mergesort_parallel(mid_a, num_rhs, mid_b, !flag);
         }
         #pragma omp taskwait
-        merge(a, b, mid_b, num_lhs, num_rhs, l);
+        merge_parallel(a, b, mid_b, num_lhs, num_rhs);
+        //merge(a, b, mid_b, num_lhs, num_rhs, l);
 
     }
 
