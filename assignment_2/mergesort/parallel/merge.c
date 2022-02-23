@@ -16,9 +16,9 @@ typedef enum Ordering {ASCENDING, DESCENDING, RANDOM} Order;
 int debug = 0;
 int num_threads = 1;
 
-void inline merge(int *a, int *b, int *mid_b, int num_lhs, int num_rhs, int l){
-    int i=0,j=0;
-    for(int k = 0; k < l; k++) {
+void inline merge(int *a, int *b, int *mid_b, long num_lhs, long num_rhs, long l){
+    long i=0,j=0;
+    for(long k = 0; k < l; k++) {
         if (i < num_lhs && (j >= num_rhs || b[i] <= mid_b[j])) {
             a[k] = b[i];
             i++;
@@ -32,8 +32,8 @@ void inline merge(int *a, int *b, int *mid_b, int num_lhs, int num_rhs, int l){
 void top_down_mergesort(int *b, long l, int *a){
     if(l<=1)
         return;
-    int num_rhs = l/2;
-    int num_lhs = l-num_rhs;
+    long num_rhs = l/2;
+    long num_lhs = l-num_rhs;
     int *mid_a = a+num_lhs;
     int *mid_b = b+num_lhs;
     top_down_mergesort(a, num_lhs, b);
@@ -41,14 +41,14 @@ void top_down_mergesort(int *b, long l, int *a){
     merge(a, b, mid_b, num_lhs, num_rhs, l);
 }
 
-int threshold = 4096;
+long threshold = 4096;
 //const int threshold = 8192;
 
-int inline binary_search(int *a, int len, int r){
-    int L=0,R=len-1;
-    int ans=0;
+long inline binary_search(int *a, long len, int r){
+    long L=0,R=len-1;
+    long ans=0;
     while(L<=R){
-        int mid = (L+R)/2;
+        long mid = (L+R)/2;
         if(a[mid]<=r){
             ans=mid+1;
             L=mid+1;
@@ -59,8 +59,8 @@ int inline binary_search(int *a, int len, int r){
     return ans;
 }
 
-void merge_parallel(int *a, int *b, int *c, int num_lhs, int num_rhs){
-    int l = num_lhs + num_rhs;
+void merge_parallel(int *a, int *b, int *c, long num_lhs, long num_rhs){
+    long l = num_lhs + num_rhs;
     if(l<=threshold){
         merge(a,b,c,num_lhs,num_rhs,l);
         return;
@@ -69,12 +69,12 @@ void merge_parallel(int *a, int *b, int *c, int num_lhs, int num_rhs){
         int* temp=b;
         b=c;
         c=temp;
-        int t=num_lhs;
+        long t=num_lhs;
         num_lhs=num_rhs;
         num_rhs=t;
     }
-    int rb = num_lhs/2;
-    int rc = binary_search(c,num_rhs,b[rb-1]);
+    long rb = num_lhs/2;
+    long rc = binary_search(c,num_rhs,b[rb-1]);
     //printf("%d %d\n",rb,rc);
     a[rb+rc-1] = b[rb-1];
     #pragma omp task
@@ -97,8 +97,8 @@ void top_down_mergesort_parallel(int *b, long l, int *a, bool flag){
         top_down_mergesort(b,l,a);
         return;    
     }else{
-        int num_rhs = l/2;
-        int num_lhs = l-num_rhs;
+        long num_rhs = l/2;
+        long num_lhs = l-num_rhs;
         int *mid_a = a+num_lhs;
         int *mid_b = b+num_lhs;
         #pragma omp task
@@ -164,7 +164,7 @@ int main(int argc, char **argv) {
     struct timespec before, after;
 
     /* Read command-line options. */
-    while((c = getopt(argc, argv, "adrgp:l:s:")) != -1) {
+    while((c = getopt(argc, argv, "adrgp:l:s:t:")) != -1) {
         switch(c) {
             case 't':
                 threshold = atol(optarg);
@@ -189,6 +189,7 @@ int main(int argc, char **argv) {
                 break;
             case 'p':
                 num_threads = atoi(optarg);
+                omp_set_num_threads(num_threads);
                 break;
             case '?':
                 if(optopt == 'l' || optopt == 's') {
