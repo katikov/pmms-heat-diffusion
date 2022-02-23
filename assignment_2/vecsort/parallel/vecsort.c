@@ -47,7 +47,7 @@ void inline merge(int *a, int *b, int *mid_b, int num_lhs, int num_rhs, int l){
 
 }
 
-int threshold = 4096;
+int threshold = 16384;
 void merge_parallel(int *a, int *b, int *c, int num_lhs, int num_rhs){
     int l = num_lhs + num_rhs;
     if(l<=threshold){
@@ -125,16 +125,16 @@ void vecsort(int **vector_vectors, int *vector_lengths, long length_outer, int l
 
     omp_set_nested(1);
 
-#pragma omp parallel num_threads(outer_threads) private(b) // alloc 4 threads as main threads at most
+#pragma omp parallel num_threads(outer_threads) private(b) 
     {
         b = (int*)malloc(sizeof(int)*length_inner_max);
 #pragma omp for schedule(guided)
         for(long i = 0; i < length_outer; i++) {
             
-            memcpy(b,vector_vectors[i],vector_lengths[i]*sizeof(int));
-#pragma omp parallel num_threads(inner_threads) // alloc 6 threads for task theads to split vector
+            //memcpy(b,vector_vectors[i],vector_lengths[i]*sizeof(int));
+#pragma omp parallel num_threads(inner_threads) 
             {
-#pragma omp single // sort 1 vector with 1 thread
+#pragma omp single 
                 {
                     top_down_mergesort_parallel(b, vector_lengths[i], vector_vectors[i],0);
                     

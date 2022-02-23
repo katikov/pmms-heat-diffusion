@@ -41,7 +41,7 @@ void top_down_mergesort(int *b, long l, int *a){
     merge(a, b, mid_b, num_lhs, num_rhs, l);
 }
 
-long threshold = 4096;
+long threshold = 16384;
 //const int threshold = 8192;
 
 long inline binary_search(int *a, long len, int r){
