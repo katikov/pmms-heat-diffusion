@@ -13,13 +13,6 @@
 
 /* Ordering of the vector */
 typedef enum Ordering {ASCENDING, DESCENDING, RANDOM} Order;
-
-/*
-    num_threads    task_threads    calculation time
-    2              6               1.00116026 sec
-    4              6               0.58464072 sec
-    4              7               0.5737095  sec
-*/
 int debug = 0;
 int num_threads = 0;
 int inner_threads = 0;
@@ -54,7 +47,7 @@ void inline merge(int *a, int *b, int *mid_b, int num_lhs, int num_rhs, int l){
 
 }
 
-int threshold = 1000;
+int threshold = 4096;
 void merge_parallel(int *a, int *b, int *c, int num_lhs, int num_rhs){
     int l = num_lhs + num_rhs;
     if(l<=threshold){
@@ -135,7 +128,7 @@ void vecsort(int **vector_vectors, int *vector_lengths, long length_outer, int l
 #pragma omp parallel num_threads(outer_threads) private(b) // alloc 4 threads as main threads at most
     {
         b = (int*)malloc(sizeof(int)*length_inner_max);
-#pragma omp for
+#pragma omp for schedule(guided)
         for(long i = 0; i < length_outer; i++) {
             
             memcpy(b,vector_vectors[i],vector_lengths[i]*sizeof(int));
@@ -243,8 +236,8 @@ int main(int argc, char **argv) {
             inner_threads = 32/outer_threads;
             num_threads = outer_threads*inner_threads; 
         }else{
-            inner_threads = 8;
-            outer_threads = 4;
+            inner_threads = 2;
+            outer_threads = 16;
             num_threads = 32;
         }
     }else{
@@ -253,8 +246,7 @@ int main(int argc, char **argv) {
         }else if(inner_threads){
             outer_threads = num_threads / outer_threads;
         }else{
-            if(num_threads%4==0)inner_threads = 4;
-            else if(num_threads%2==0) inner_threads = 2;
+            if(num_threads%2==0) inner_threads = 2;
             else inner_threads = 1;
             outer_threads = num_threads/inner_threads;
         }
