@@ -1,0 +1,60 @@
+10000 a
+Mergesort took:  6.964533e-03 seconds 
+Mergesort took:  7.834283e-03 seconds 
+Mergesort took:  7.574758e-03 seconds 
+100000 a
+Mergesort took:  6.274847e-03 seconds 
+Mergesort took:  1.372467e-02 seconds 
+Mergesort took:  1.075591e-02 seconds 
+1000000 a
+Mergesort took:  1.400749e-02 seconds 
+Mergesort took:  1.458419e-02 seconds 
+Mergesort took:  1.653937e-02 seconds 
+10000000 a
+Mergesort took:  8.972445e-02 seconds 
+Mergesort took:  8.243765e-02 seconds 
+Mergesort took:  8.238126e-02 seconds 
+100000000 a
+Mergesort took:  5.986136e-01 seconds 
+Mergesort took:  5.778124e-01 seconds 
+Mergesort took:  5.902153e-01 seconds 
+10000 d
+Mergesort took:  7.777758e-03 seconds 
+Mergesort took:  6.320878e-03 seconds 
+Mergesort took:  5.042577e-03 seconds 
+100000 d
+Mergesort took:  1.008875e-02 seconds 
+Mergesort took:  1.015292e-02 seconds 
+Mergesort took:  1.517032e-02 seconds 
+1000000 d
+Mergesort took:  2.325297e-02 seconds 
+Mergesort took:  1.281721e-02 seconds 
+Mergesort took:  2.471920e-02 seconds 
+10000000 d
+Mergesort took:  8.596081e-02 seconds 
+Mergesort took:  8.492381e-02 seconds 
+Mergesort took:  8.772976e-02 seconds 
+100000000 d
+Mergesort took:  5.983475e-01 seconds 
+Mergesort took:  5.754176e-01 seconds 
+Mergesort took:  5.960970e-01 seconds 
+10000 r
+Mergesort took:  5.354899e-03 seconds 
+Mergesort took:  6.013037e-03 seconds 
+Mergesort took:  6.304173e-03 seconds 
+100000 r
+Mergesort took:  1.319756e-02 seconds 
+Mergesort took:  9.419797e-03 seconds 
+Mergesort took:  8.222195e-03 seconds 
+1000000 r
+Mergesort took:  2.402744e-02 seconds 
+Mergesort took:  3.261868e-02 seconds 
+Mergesort took:  2.386010e-02 seconds 
+10000000 r
+Mergesort took:  1.646626e-01 seconds 
+Mergesort took:  1.569718e-01 seconds 
+Mergesort took:  1.572388e-01 seconds 
+100000000 r
+Mergesort took:  1.133098e+00 seconds 
+Mergesort took:  1.182939e+00 seconds 
+Mergesort took:  1.188560e+00 seconds 
