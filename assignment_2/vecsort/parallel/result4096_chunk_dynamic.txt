@@ -1,40 +1,40 @@
 1
-Vecsort took:  2.733543e-01 seconds 
-Vecsort took:  2.766283e-01 seconds 
-Vecsort took:  2.794518e-01 seconds 
+Vecsort took:  2.685413e-01 seconds 
+Vecsort took:  2.669497e-01 seconds 
+Vecsort took:  2.672319e-01 seconds 
 2
-Vecsort took:  2.751685e-01 seconds 
-Vecsort took:  2.742463e-01 seconds 
-Vecsort took:  2.745361e-01 seconds 
+Vecsort took:  2.693953e-01 seconds 
+Vecsort took:  2.769170e-01 seconds 
+Vecsort took:  2.716116e-01 seconds 
 5
-Vecsort took:  2.775527e-01 seconds 
-Vecsort took:  2.840004e-01 seconds 
-Vecsort took:  2.796897e-01 seconds 
+Vecsort took:  2.810649e-01 seconds 
+Vecsort took:  2.758263e-01 seconds 
+Vecsort took:  2.728573e-01 seconds 
 10
-Vecsort took:  2.900726e-01 seconds 
-Vecsort took:  2.949197e-01 seconds 
-Vecsort took:  2.933093e-01 seconds 
+Vecsort took:  2.908053e-01 seconds 
+Vecsort took:  2.807155e-01 seconds 
+Vecsort took:  2.812268e-01 seconds 
 20
-Vecsort took:  3.061398e-01 seconds 
-Vecsort took:  3.037991e-01 seconds 
-Vecsort took:  3.046586e-01 seconds 
+Vecsort took:  2.992205e-01 seconds 
+Vecsort took:  2.974400e-01 seconds 
+Vecsort took:  2.940442e-01 seconds 
 50
-Vecsort took:  3.637614e-01 seconds 
-Vecsort took:  3.615250e-01 seconds 
-Vecsort took:  3.560273e-01 seconds 
+Vecsort took:  3.548459e-01 seconds 
+Vecsort took:  3.568713e-01 seconds 
+Vecsort took:  3.542695e-01 seconds 
 100
-Vecsort took:  3.872098e-01 seconds 
-Vecsort took:  3.702879e-01 seconds 
-Vecsort took:  3.860037e-01 seconds 
+Vecsort took:  3.821960e-01 seconds 
+Vecsort took:  3.813405e-01 seconds 
+Vecsort took:  3.807066e-01 seconds 
 500
-Vecsort took:  1.424657e+00 seconds 
-Vecsort took:  1.499380e+00 seconds 
-Vecsort took:  1.423243e+00 seconds 
+Vecsort took:  1.306933e+00 seconds 
+Vecsort took:  1.376971e+00 seconds 
+Vecsort took:  1.388612e+00 seconds 
 1000
-Vecsort took:  3.624962e+00 seconds 
-Vecsort took:  3.577775e+00 seconds 
-Vecsort took:  3.499617e+00 seconds 
+Vecsort took:  2.434232e+00 seconds 
+Vecsort took:  2.442794e+00 seconds 
+Vecsort took:  2.430298e+00 seconds 
 2000
-Vecsort took:  3.483975e+00 seconds 
-Vecsort took:  3.428017e+00 seconds 
-Vecsort took:  3.492285e+00 seconds 
+Vecsort took:  2.430430e+00 seconds 
+Vecsort took:  2.487937e+00 seconds 
+Vecsort took:  2.589075e+00 seconds 
