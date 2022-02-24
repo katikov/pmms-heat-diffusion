@@ -17,7 +17,7 @@ int debug = 0;
 int num_threads = 0;
 int inner_threads = 0;
 int outer_threads = 0;
-
+int chunk = 0;
 int inline binary_search(int *a, int len, int r){
     int L=0,R=len-1;
     int ans=0;
@@ -47,7 +47,7 @@ void inline merge(int *a, int *b, int *mid_b, int num_lhs, int num_rhs, int l){
 
 }
 
-int threshold = 16384;
+int threshold = 4096;
 void merge_parallel(int *a, int *b, int *c, int num_lhs, int num_rhs){
     int l = num_lhs + num_rhs;
     if(l<=threshold){
@@ -119,7 +119,7 @@ void top_down_mergesort_parallel(int *b, int l, int *a, bool flag){
 }
 
 /* Sort vector v of l elements using mergesort */
-void vecsort(int **vector_vectors, int *vector_lengths, long length_outer, int length_inner_max){
+void vecsort(int chunk_size,int **vector_vectors, int *vector_lengths, long length_outer, int length_inner_max){
 
     int *b;
 
@@ -128,7 +128,7 @@ void vecsort(int **vector_vectors, int *vector_lengths, long length_outer, int l
 #pragma omp parallel num_threads(outer_threads) private(b) 
     {
         b = (int*)malloc(sizeof(int)*length_inner_max);
-#pragma omp for schedule(guided)
+#pragma omp for schedule(guided,chunk_size)
         for(long i = 0; i < length_outer; i++) {
             
             //memcpy(b,vector_vectors[i],vector_lengths[i]*sizeof(int));
@@ -175,8 +175,11 @@ int main(int argc, char **argv) {
 
 
     /* Read command-line options. */
-    while ((c = getopt(argc, argv, "adrgn:x:l:p:s:t:o:i:")) != -1) {
+    while ((c = getopt(argc, argv, "adrgn:x:l:p:s:t:c:o:i")) != -1) {
         switch (c) {
+            case 'c': //chunk size
+		chunk = atoi(optarg);
+                break;
             case 't': //threshold
                 threshold = atol(optarg);
                 break;
@@ -299,7 +302,7 @@ int main(int argc, char **argv) {
     clock_gettime(CLOCK_MONOTONIC, &before);
 
     /* Sort */
-    vecsort(vector_vectors, vector_lengths, length_outer, length_inner_max);
+    vecsort(chunk,vector_vectors, vector_lengths, length_outer, length_inner_max);
 
     clock_gettime(CLOCK_MONOTONIC, &after);
     double time = (double)(after.tv_sec - before.tv_sec) +
