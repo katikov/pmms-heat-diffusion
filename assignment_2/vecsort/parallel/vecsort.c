@@ -131,7 +131,7 @@ void vecsort(int **vector_vectors, int *vector_lengths, long length_outer, int l
 #pragma omp for schedule(guided)
         for(long i = 0; i < length_outer; i++) {
             
-            //memcpy(b,vector_vectors[i],vector_lengths[i]*sizeof(int));
+//           memcpy(b,vector_vectors[i],vector_lengths[i]*sizeof(int));
 #pragma omp parallel num_threads(inner_threads) 
             {
 #pragma omp single 
