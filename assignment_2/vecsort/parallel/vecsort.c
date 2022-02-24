@@ -125,22 +125,22 @@ void vecsort(int **vector_vectors, int *vector_lengths, long length_outer, int l
 
     omp_set_nested(1);
 
-#pragma omp parallel num_threads(outer_threads) private(b) 
+#pragma omp parallel num_threads(num_threads) private(b) 
     {
         b = (int*)malloc(sizeof(int)*length_inner_max);
 #pragma omp for schedule(guided)
         for(long i = 0; i < length_outer; i++) {
             
-            //memcpy(b,vector_vectors[i],vector_lengths[i]*sizeof(int));
-#pragma omp parallel num_threads(inner_threads) 
-            {
-#pragma omp single 
-                {
-                    top_down_mergesort_parallel(b, vector_lengths[i], vector_vectors[i],0);
-                    
-                };
-            }
-        }
+            memcpy(b,vector_vectors[i],vector_lengths[i]*sizeof(int));
+// #pragma omp parallel num_threads(inner_threads) 
+//             {
+// #pragma omp single 
+//                 {
+//                     top_down_mergesort_parallel(b, vector_lengths[i], vector_vectors[i],0);
+            top_down_mergesort(b, vector_lengths[i], vector_vectors[i]);
+//                 };
+//             }
+//         }
         free(b);
     }
 }
