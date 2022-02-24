@@ -123,7 +123,7 @@ void vecsort(int **vector_vectors, int *vector_lengths, long length_outer, int l
 
     int *b;
 
-    omp_set_nested(1);
+   // omp_set_nested(1);
 
 #pragma omp parallel num_threads(num_threads) private(b) 
     {
@@ -141,10 +141,12 @@ void vecsort(int **vector_vectors, int *vector_lengths, long length_outer, int l
 //                 };
 //             }
 //         }
-        free(b);
-    }
+//         
+      }  
+      free(b);
+//    }
 }
-
+}
 void print_v(int **vector_vectors, int *vector_lengths, long length_outer) {
     printf("\n");
     for(long i = 0; i < length_outer; i++) {
