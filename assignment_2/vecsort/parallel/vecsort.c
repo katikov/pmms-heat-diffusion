@@ -128,7 +128,7 @@ void vecsort(int chunk_size,int **vector_vectors, int *vector_lengths, long leng
 #pragma omp parallel num_threads(outer_threads) private(b) 
     {
         b = (int*)malloc(sizeof(int)*length_inner_max);
-#pragma omp for schedule(guided,chunk_size)
+#pragma omp for schedule(dynamic,chunk_size)
         for(long i = 0; i < length_outer; i++) {
             
             //memcpy(b,vector_vectors[i],vector_lengths[i]*sizeof(int));

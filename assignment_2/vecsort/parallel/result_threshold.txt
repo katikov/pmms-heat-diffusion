@@ -1,0 +1,44 @@
+2
+Vecsort took:  3.251452e+01 seconds 
+Vecsort took:  3.257847e+01 seconds 
+Vecsort took:  3.274805e+01 seconds 
+8
+Vecsort took:  9.826899e+00 seconds 
+Vecsort took:  1.004547e+01 seconds 
+Vecsort took:  9.621509e+00 seconds 
+32
+Vecsort took:  2.313460e+00 seconds 
+Vecsort took:  2.427204e+00 seconds 
+Vecsort took:  2.267917e+00 seconds 
+128
+Vecsort took:  6.500416e-01 seconds 
+Vecsort took:  6.354377e-01 seconds 
+Vecsort took:  6.480631e-01 seconds 
+512
+Vecsort took:  3.247749e-01 seconds 
+Vecsort took:  3.284663e-01 seconds 
+Vecsort took:  3.187677e-01 seconds 
+1024
+Vecsort took:  2.871028e-01 seconds 
+Vecsort took:  2.880455e-01 seconds 
+Vecsort took:  2.892245e-01 seconds 
+4096
+Vecsort took:  2.739673e-01 seconds 
+Vecsort took:  2.782110e-01 seconds 
+Vecsort took:  2.732399e-01 seconds 
+8192
+Vecsort took:  2.704888e-01 seconds 
+Vecsort took:  2.748837e-01 seconds 
+Vecsort took:  2.798822e-01 seconds 
+16384
+Vecsort took:  2.842485e-01 seconds 
+Vecsort took:  2.786429e-01 seconds 
+Vecsort took:  2.814608e-01 seconds 
+32786
+Vecsort took:  2.934168e-01 seconds 
+Vecsort took:  2.894598e-01 seconds 
+Vecsort took:  2.899746e-01 seconds 
+65536
+Vecsort took:  3.425788e-01 seconds 
+Vecsort took:  3.488350e-01 seconds 
+Vecsort took:  3.445667e-01 seconds 
