@@ -1,0 +1,36 @@
+65536
+Mergesort took:  1.609107e-01 seconds 
+Mergesort took:  1.553833e-01 seconds 
+Mergesort took:  1.529446e-01 seconds 
+32786
+Mergesort took:  1.491165e-01 seconds 
+Mergesort took:  1.478901e-01 seconds 
+Mergesort took:  1.616676e-01 seconds 
+16384
+Mergesort took:  1.545550e-01 seconds 
+Mergesort took:  1.620021e-01 seconds 
+Mergesort took:  1.549397e-01 seconds 
+8192
+Mergesort took:  1.809556e-01 seconds 
+Mergesort took:  1.859180e-01 seconds 
+Mergesort took:  1.779528e-01 seconds 
+4096
+Mergesort took:  3.141995e-01 seconds 
+Mergesort took:  3.175031e-01 seconds 
+Mergesort took:  2.744392e-01 seconds 
+1024
+Mergesort took:  1.503817e+00 seconds 
+Mergesort took:  1.440082e+00 seconds 
+Mergesort took:  1.458127e+00 seconds 
+512
+Mergesort took:  3.055276e+00 seconds 
+Mergesort took:  3.107047e+00 seconds 
+Mergesort took:  3.046278e+00 seconds 
+128
+Mergesort took:  1.307939e+01 seconds 
+Mergesort took:  1.361307e+01 seconds 
+Mergesort took:  1.357379e+01 seconds 
+64
+Mergesort took:  2.807644e+01 seconds 
+Mergesort took:  2.704873e+01 seconds 
+Mergesort took:  2.648161e+01 seconds 
