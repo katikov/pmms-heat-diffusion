@@ -95,8 +95,8 @@ static void readpgm_float(const char *fname,
 
 
 int omp_heat_chunk_size = 50;
-int omp_heat_parallel_type = 2;
-int omp_heat_percentual = 1;
+int omp_heat_parallel_type = 0;
+int omp_heat_percentual = 0;
 int omp_heat_columns = 0;
 int omp_heat_pure_seq = 0;
 
