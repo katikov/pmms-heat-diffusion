@@ -4,11 +4,10 @@
 
 #define FPOPS_PER_POINT_PER_ITERATION (                 \
         1     /* current point 1 mul */ +               \
-        1 + 1 /* direct neighbors 3 adds + 1 mul */ +   \
-        1 + 1 /* diagonal neighbors 3 adds + 1 mul */ + \
+        3 + 1 /* direct neighbors 3 adds + 1 mul */ +   \
+        3 + 1 /* diagonal neighbors 3 adds + 1 mul */ + \
         2     /* final add */ +                         \
-        1     /* difference old/new */+                 \
-        2     /*precompute*/                            \
+        1     /* difference old/new */                  \
         )
 
 void report_results(const struct parameters *p, const struct results *r)

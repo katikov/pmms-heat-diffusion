@@ -29,6 +29,10 @@ static void usage(const char *pname)
            "  -H NUM     Warmest temperature in input/output images.\n"
            "  -p NUM     Number of threads to use (when applicable).\n"
            "  -r         Print a report every reduction cycle.\n"
+           "  -w         Parallel Chunk Size.\n"
+           "  -P         Parallelization Type (0-Static, 1-Dynamic, 2-Adaptive).\n"
+           "  -x         Parallel Chunk Size as Percent per Thread.\n"
+           "  -S         Execute as Pure Sequential.\n"
            "  -h         Print this help.\n"
            ,pname);
     exit(0);
@@ -41,7 +45,7 @@ static void readpgm_float(const char *fname,
     char format[3];
     FILE *f;
     unsigned imgw, imgh, maxv, v;
-    size_t i;
+    size_t i,j;
 
     printf("Reading PGM data from %s...\n", fname);
 
@@ -53,21 +57,48 @@ static void readpgm_float(const char *fname,
     if (fscanf(f, "%u", &imgw) != 1 ||
         fscanf(f, "%u", &imgh) != 1 ||
         fscanf(f, "%u", &maxv) != 1) die("invalid input");
-    
-    if (imgw != width || imgh != height) {
+
+    if (imgw > width || imgh > height) {
         fprintf(stderr, "input data size (%ux%u) does not match cylinder size (%zux%zu)\n",
                 imgw, imgh, width, height);
         die("invalid input");
     }
 
-    for (i = 0; i < width * height; ++i)
+
+    int min_h = (imgh < height)?imgh:height;
+    int min_w = (imgw < width)?imgw:width;
+
+    for (i = 0; i < min_h; ++i)
     {
-        if (fscanf(f, "%u", &v) != 1) die("invalid data");
-        data[i] = dmin + (double)v * (dmax - dmin) / maxv;
+        for (j = 0; j < min_w; ++j){
+            if (fscanf(f, "%u", &v) != 1) die("invalid data");
+            data[i* width + j] = dmin + (double)v * (dmax - dmin) / maxv;
+        }
+        for (j;j < imgw;++j) fscanf(f,"%u",&v);
+    }
+
+    int im, jm;
+    if (min_w < width || min_h < height) {
+        for (i = 0; i < height; ++i) {
+            for (j = 0; j < width; ++j) {
+                if (i >= min_h || j >= min_w){
+                    im = (i % min_h);
+                    jm = (j % min_w);
+                    data[i * width + j] = data[im* width + jm];
+                }
+            }
+        }
     }
 
     fclose(f);
 }
+
+
+int omp_heat_chunk_size = 50;
+int omp_heat_parallel_type = 2;
+int omp_heat_percentual = 1;
+int omp_heat_columns = 0;
+int omp_heat_pure_seq = 0;
 
 void read_parameters(struct parameters* p, int argc, char **argv)
 {
@@ -83,12 +114,12 @@ void read_parameters(struct parameters* p, int argc, char **argv)
     p->threshold = 0.1;
     p->io_tmin = -100.0;
     p->io_tmax = 100.0;
-    p->nthreads = 1;
+    p->nthreads = 16;
     p->printreports = 0;
     conductivity_fname = "../../images/pat1_100x150.pgm";
     tinit_fname = "../../images/pat1_100x150.pgm";
 
-    while ((ch = getopt(argc, argv, "c:e:hH:i:k:L:m:M:n:N:p:t:r:")) != -1)
+    while ((ch = getopt(argc, argv, "c:e:hH:i:k:L:m:M:n:N:p:t:r:w:P:x:C:S:")) != -1)
     {
         switch(ch) {
         case 'c': conductivity_fname = optarg; break;
@@ -102,6 +133,11 @@ void read_parameters(struct parameters* p, int argc, char **argv)
         case 'H': p->io_tmax = strtod(optarg, 0); break;
         case 'p': p->nthreads = strtol(optarg, 0, 10); break;
         case 'r': p->printreports = 1; break;
+        case 'w': omp_heat_chunk_size = strtol(optarg, 0, 10); break;
+        case 'P': omp_heat_parallel_type = strtol(optarg, 0, 10); break;
+        case 'x': omp_heat_percentual = 1; break;
+        case 'C': omp_heat_columns = 1; break;
+        case 'S': omp_heat_pure_seq = 1; break;
         case 'h': default: usage(argv[0]);
         }
     }
@@ -117,12 +153,22 @@ void read_parameters(struct parameters* p, int argc, char **argv)
            "  -L %e # coolest temperature in input/output\n"
            "  -H %e # highest temperature in input/output\n"
            "  -p %zu # number of threads (if applicable)\n"
-           "  -r %zu # print intermediate reports every reduction cycle\n",
+           "  -r %zu # print intermediate reports every reduction cycle\n"
+           "  -w %d # chunk size\n"
+           "  -P %d # parallelism type\n"
+           "  -x %d # chunk size as percent\n"
+           "  -C %d # parallelize columns\n"
+           "  -S %d # pure sequential\n",
            p->N, p->M, p->maxiter, p->period, p->threshold,
            conductivity_fname ? conductivity_fname : "(none)",
            tinit_fname ? tinit_fname : "(none)",
            p->io_tmin, p->io_tmax,
-           p->nthreads, p->printreports);
+           p->nthreads, p->printreports,
+           omp_heat_chunk_size, 
+           omp_heat_parallel_type, 
+           omp_heat_percentual, 
+           omp_heat_columns,
+           omp_heat_pure_seq);
 
     if (!p->N || !p->M) die("empty grid");
 
@@ -138,6 +184,3 @@ void read_parameters(struct parameters* p, int argc, char **argv)
         readpgm_float(conductivity_fname, p->N, p->M, conductivity, 0.0, 1.0);
     p->conductivity = conductivity;
 }
-
-
- 
