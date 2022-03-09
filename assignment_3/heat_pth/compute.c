@@ -228,6 +228,50 @@ void* do_compute_parallel(void* params){
     return NULL;
 }
 
+
+void* do_compute_parallel_once(void* params){
+    const struct parameters* p = _p;
+    const size_t h = _h, w = _w;
+    double (*restrict src)[h][w] = _src;
+    double (*restrict dst)[h][w] = _dst;
+
+    double (*restrict c)[h][w] = _c;
+
+    const double c_cdir = _c_cdir, c_cdiag = _c_cdiag;
+    struct results *r = _r;
+
+    int tid = *(int *)params;
+    int start = tid*(p->N)/proc_count+1;
+    int end = (tid+1)*(p->N)/proc_count;
+    
+
+    double maxdiff = 0.0; 
+    for (int i = start; i <= end; ++i) {
+        for (int j = 1; j < w - 1; ++j)
+        {
+            double w = (*c)[i][j];
+            double restw = 1.0 - w;
+
+            (*dst)[i][j] = w * (*src)[i][j] +
+
+                ((*src)[i + 1][j] + (*src)[i - 1][j] +
+                    (*src)[i][j + 1] + (*src)[i][j - 1]) * (restw * c_cdir) +
+
+                ((*src)[i - 1][j - 1] + (*src)[i - 1][j + 1] +
+                    (*src)[i + 1][j - 1] + (*src)[i + 1][j + 1]) * (restw * c_cdiag);
+
+            double diff = fabs((*dst)[i][j] - (*src)[i][j]);
+            if (diff > maxdiff) maxdiff = diff;
+        }
+    }
+    pthread_mutex_lock(&mutex_diff);
+    _maxdiff = MAX(_maxdiff, maxdiff);
+    pthread_mutex_unlock(&mutex_diff);
+
+    
+    return NULL;
+}
+
 void do_compute(const struct parameters* p, struct results *r)
 {
 
@@ -299,20 +343,61 @@ void do_compute(const struct parameters* p, struct results *r)
 
 
     clock_gettime(CLOCK_MONOTONIC, &before);
-    for(int i=0;i<proc_count;i++){
-        pthread_create(&thread_ids[i], NULL, &do_compute_parallel, &params[i]);
-    }
-    for(int i=0;i<proc_count;i++){
-        void* result;
-        pthread_join(thread_ids[i], &result);
+    for (iter = 1; iter <= p->maxiter; ++iter)
+    {
+        /* swap source and destination */
+        { void *tmp = _src; _src = _dst; _dst = tmp; }
+
+        /* initialize halo on source */
+        do_copy(h, w, _src);
+
+        _maxdiff = 0.0;
+        /* compute */
+
+        for(int i=0;i<proc_count;i++){
+            pthread_create(&thread_ids[i], NULL, &do_compute_parallel_once, &params[i]);
+        }
+        for(int i=0;i<proc_count;i++){
+            void* result;
+            pthread_join(thread_ids[i], &result);
+        }
+
+        r->maxdiff = _maxdiff;
+        if(_maxdiff<p->threshold){iter++;break;} 
+        /* conditional reporting */
+        if (iter % p->period == 0) {
+           fill_report(p, r, h, w, dst, src, iter, &before);
+            if(p->printreports) report_results(p, r);
+        }
+        #ifdef GEN_PICTURES
+        do_draw(p, iter, h, w, src);
+        #endif
     }
 
+
+    // for(int i=0;i<proc_count;i++){
+    //     pthread_create(&thread_ids[i], NULL, &do_compute_parallel, &params[i]);
+    // }
+    // for(int i=0;i<proc_count;i++){
+    //     void* result;
+    //     pthread_join(thread_ids[i], &result);
+    // }
+
     // report at end in all cases 
-    _iter--;
-    if(_iter%2){
+
+    // _iter--;
+    // if(_iter%2){
+    //     void *tmp = src; src = dst; dst = tmp; 
+    // }
+    // fill_report(p, r, h, w, dst, src, _iter, &before);
+
+
+
+    iter--;
+    if(iter%2){
         void *tmp = src; src = dst; dst = tmp; 
     }
-    fill_report(p, r, h, w, dst, src, _iter, &before);
+    fill_report(p, r, h, w, dst, src, iter, &before);
 
     free(c);
     free(g2);
