@@ -5,6 +5,19 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <errno.h>
+#include <pthread.h>
+int num_rows;
+int num_cols;
+int num_threads;
+int workload_per_thread;
+struct thread_data
+{
+   int	thread_id;
+   int  *histogram;
+   int  *image;
+   int  start;
+   int  end;
+};
 
 void die(const char *msg){
     if (errno != 0) 
@@ -59,6 +72,7 @@ void print_histo(int * histo){
             printf("\n");
         }
 		printf("%d ", histo[i]);
+		// printf("[%d]: %d\n",i+1, histo[i]);
 	}
     printf("\n");
 }
@@ -74,8 +88,23 @@ void print_image(int num_rows, int num_cols, int * image){
 	printf("\n");
 }
 
-void histogram(int * histo, int * image){
+void *histogram(void* threadarg){
     //TODO: For Students
+    int taskid, start, end;
+    int *histogram, *image;
+    struct thread_data *my_data;
+    my_data = (struct thread_data *) threadarg;
+
+    taskid  = my_data->thread_id;
+    start   = my_data->start;
+    end     = my_data->end;
+    image   = my_data->image;
+    histogram = my_data->histogram;
+
+    for (int i = start; i <= end; ++i){	
+		histogram[image[i]]++;
+	}
+    pthread_exit((void*) histogram);
 }
 
 int main(int argc, char *argv[]){
@@ -86,9 +115,9 @@ int main(int argc, char *argv[]){
     int gen_image = 0;
     int debug = 0;
 
-    int num_rows = 150;
-    int num_cols = 100;
-    int num_threads = 1;
+    num_rows = 150;
+    num_cols = 100;
+    num_threads = 1;
 
     struct timespec before, after;
 
@@ -125,7 +154,16 @@ int main(int argc, char *argv[]){
                 return -1;
         }
     }
+    /* Create pthread and attributes */
+    pthread_t p_threads[ num_threads ];
+    pthread_attr_t attr;
+    pthread_attr_init ( &attr ); 
+    pthread_attr_setscope ( &attr , PTHREAD_SCOPE_SYSTEM );
     
+    /* Create a list of pointers to store thread return values */
+    void *results[num_threads];
+    struct thread_data thread_data_array[num_threads];
+    workload_per_thread = num_cols * num_rows / num_threads;
     int * image = (int *) malloc(sizeof(int) * num_cols * num_rows);
 
     /* Seed such that we can always reproduce the same random vector */
@@ -136,13 +174,43 @@ int main(int argc, char *argv[]){
     	read_image(image_path,num_rows, num_cols, image);
     }
 
+    /* Intial thread data structure */
+    int count = 0;
+    int i;
+    for(i=0; i<num_threads; i++){
+        thread_data_array[i].thread_id = i;
+        thread_data_array[i].histogram = (int*) calloc(256, sizeof(int));
+        thread_data_array[i].image = image;
+        thread_data_array[i].start = count;
+        if(i==num_threads-1)
+            thread_data_array[i].end = num_cols*num_rows-1;
+        else
+            thread_data_array[i].end = count+workload_per_thread-1;
+        
+        // printf("%d %d\n", thread_data_array[i].start, thread_data_array[i].end);
+        count+=workload_per_thread;
+    }
+
     clock_gettime(CLOCK_MONOTONIC, &before);
     /* Do your thing here */
 
-
-    histogram(histo, image);
+    for(i=0;i<num_threads;i++){
+        pthread_create(&p_threads[i], &attr, &histogram, (void *) 
+       &thread_data_array[i]); 
+    }
+    for(i=0;i<num_threads;i++){
+        pthread_join(p_threads[i],
+                     &results[i]);
+    }
 
     /* Do your thing here */
+
+    /* Combine thread return histogram */
+    for(i=0; i<num_threads; i++){
+        for(int j=0; j<256; j++){
+            histo[j] = histo[j] + ((int*)results[i])[j];
+        }
+    }
 
     if (debug){
     	print_histo(histo);
