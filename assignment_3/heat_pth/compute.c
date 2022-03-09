@@ -354,10 +354,11 @@ void do_compute(const struct parameters* p, struct results *r)
         _maxdiff = 0.0;
         /* compute */
 
-        for(int i=0;i<proc_count;i++){
+        for(int i=1;i<proc_count;i++){
             pthread_create(&thread_ids[i], NULL, &do_compute_parallel_once, &params[i]);
         }
-        for(int i=0;i<proc_count;i++){
+        do_compute_parallel_once(&params[0]);
+        for(int i=1;i<proc_count;i++){
             void* result;
             pthread_join(thread_ids[i], &result);
         }
