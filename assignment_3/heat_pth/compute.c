@@ -54,7 +54,6 @@ static void inline do_copy_parallel(size_t h, size_t w,
 
 
 // Does the reduction step and return if the convergence has setteled 
-// TODO: parallel fill
 static int fill_report(const struct parameters *p, struct results *r,
                         size_t h, size_t w, 
                         double (*restrict a)[h][w],
@@ -140,6 +139,42 @@ static int inline fill_report_parallel(const struct parameters *p, struct result
  return 0;
 }
 
+void* fill_report_parallel2(void* params)
+{
+    const struct parameters* p = _p;
+    const size_t h = _h, w = _w;
+    double (*restrict src)[h][w] = _src;
+    double (*restrict dst)[h][w] = _dst;
+
+    struct results *r = _r;
+
+    int tid = *(int *)params;
+    int start = tid*(p->N)/proc_count+1;
+    int end = (tid+1)*(p->N)/proc_count;
+
+    double tmin = INFINITY, tmax = -INFINITY;
+    double sum = 0.0;
+    double maxdiff = 0.0;
+
+    for (size_t i = start; i <= end; ++i)
+        for (size_t j = 1; j < w - 1; ++j) 
+        {
+            double v = (*dst)[i][j];
+            double v_old = (*src)[i][j];
+            sum += v;
+            if (tmin > v) tmin = v;
+            if (tmax < v) tmax = v;
+        }
+
+    pthread_mutex_lock(&mutex_diff);
+    r->tmin = MIN(r->tmin,tmin);
+    r->tmax = MAX(r->tmax,tmax);
+    r->tavg += sum / (p->N * p->M);
+    pthread_mutex_unlock(&mutex_diff);
+
+ return NULL;
+}
+
 
 void* do_compute_parallel(void* params){
     const struct parameters* p = _p;
@@ -190,6 +225,7 @@ void* do_compute_parallel(void* params){
                 if (diff > maxdiff) maxdiff = diff;
             }
         }
+
         pthread_mutex_lock(&mutex_diff);
         _maxdiff = MAX(_maxdiff, maxdiff);
         pthread_mutex_unlock(&mutex_diff);
@@ -263,6 +299,8 @@ void* do_compute_parallel_once(void* params){
             double diff = fabs((*dst)[i][j] - (*src)[i][j]);
             if (diff > maxdiff) maxdiff = diff;
         }
+        (*dst)[i][w-1] = (*dst)[i][1];
+        (*dst)[i][0] = (*dst)[i][w-2];
     }
     pthread_mutex_lock(&mutex_diff);
     _maxdiff = MAX(_maxdiff, maxdiff);
@@ -322,6 +360,8 @@ void do_compute(const struct parameters* p, struct results *r)
     (*dst)[h-1][w-1] = (*dst)[h-1][1];
     (*dst)[h-1][0] = (*dst)[h-1][w-2];
 
+    do_copy(h, w, dst);
+
     proc_count = MAX(p->nthreads, 1);
 
     _r = r; _src = src; _dst = dst;
@@ -348,12 +388,9 @@ void do_compute(const struct parameters* p, struct results *r)
         /* swap source and destination */
         { void *tmp = _src; _src = _dst; _dst = tmp; }
 
-        /* initialize halo on source */
-        do_copy(h, w, _src);
-
         _maxdiff = 0.0;
-        /* compute */
 
+        /* compute */
         for(int i=1;i<proc_count;i++){
             pthread_create(&thread_ids[i], NULL, &do_compute_parallel_once, &params[i]);
         }
@@ -367,7 +404,25 @@ void do_compute(const struct parameters* p, struct results *r)
         if(_maxdiff<p->threshold){iter++;break;} 
         /* conditional reporting */
         if (iter % p->period == 0) {
-           fill_report(p, r, h, w, dst, src, iter, &before);
+            r->niter = iter;
+            r->tmin = INFINITY;
+            r->tmax = -INFINITY;
+            r->tavg = 0;
+            struct timespec after;
+            clock_gettime(CLOCK_MONOTONIC, &after);
+            r->time = (double)(after.tv_sec - before.tv_sec) + 
+                 (double)(after.tv_nsec - before.tv_nsec) / 1e9;
+
+            for(int i=1;i<proc_count;i++){
+                pthread_create(&thread_ids[i], NULL, &fill_report_parallel2, &params[i]);
+            }
+            fill_report_parallel2(&params[0]);
+            for(int i=1;i<proc_count;i++){
+                void* result;
+                pthread_join(thread_ids[i], &result);
+            }
+
+            //fill_report(p, r, h, w, _dst, _src, iter, &before);
             if(p->printreports) report_results(p, r);
         }
         #ifdef GEN_PICTURES
