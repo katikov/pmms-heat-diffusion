@@ -36,6 +36,9 @@
     double (*restrict src)[h][w] = g2;
     double (*restrict dst)[h][w] = g1;
 
+    do_copy(h, w, src);
+    do_copy(h, w, dst);
+
     /* 
      * If initialization should be included in the timings
      * could be a point of discussion. 
@@ -61,7 +64,6 @@
         { void *tmp = src; src = dst; dst = tmp; }
 
         /* initialize halo on source */
-        do_copy(h, w, src);
 
         double maxdiff = 0.0;
         /* compute */
@@ -83,6 +85,8 @@
                 double diff = fabs((*dst)[i][j] - (*src)[i][j]);
                 if (diff > maxdiff) maxdiff = diff;
             }
+            (*dst)[i][w-1] = (*dst)[i][1];
+            (*dst)[i][0] = (*dst)[i][w-2];
         }
         r->maxdiff = maxdiff;
         if(maxdiff<p->threshold){iter++;break;} 
