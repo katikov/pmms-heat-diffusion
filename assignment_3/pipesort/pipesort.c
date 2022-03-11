@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include <sys/time.h>
-sem_t end;
 typedef struct
 {
     pthread_mutex_t *m;
@@ -27,10 +26,11 @@ enum
 // global thread attributes
 pthread_attr_t attr;
 pthread_t thread;
-int buffer_size = 1;
+int buffer_size = 50;
 
 int push_buffer(int *buffer, pthread_mutex_t *m, pthread_cond_t *c_cons, pthread_cond_t *c_pro, int value, int *num, int pos)
 {
+
     pthread_mutex_lock(m);
     if (*num > buffer_size)
         exit(1);
@@ -38,7 +38,7 @@ int push_buffer(int *buffer, pthread_mutex_t *m, pthread_cond_t *c_cons, pthread
         pthread_cond_wait(c_pro, m);
     buffer[pos] = value;
     pos = (pos + 1) % buffer_size;
-    (*num)--;
+    (*num)++;
     pthread_cond_signal(c_cons);
     pthread_mutex_unlock(m);
     return pos;
@@ -55,7 +55,7 @@ void *output(void *p)
     {
         pthread_mutex_lock(p_receive->m);
         if (*num > buffer_size)
-            exit(1);      /* overflow */
+            exit(1);                /* overflow */
         while (*num == 0) /* block if buffer is full */
             pthread_cond_wait(p_receive->c_cons, p_receive->m);
         current_value = p_receive->buffer[receive_pos];
@@ -78,33 +78,38 @@ void *output(void *p)
         }
         printf("%i\n", current_value);
     }
-    sem_post(&end);
 }
 void *comparator(void *p)
 {
+    fprintf(stderr, "c");
     ComparatorPackage *p_receive = (ComparatorPackage *)p;
     int receive_pos = 0;
     int *num = p_receive->num;
     int *out_buffer = malloc(sizeof(int) * buffer_size);
-    int out_num = *num;
+    int *out_num = malloc(sizeof(int));
     int out_pos = 0;
     int store; // local store data
     int current_value;
     int state = INITIALIZE; // first state
     pthread_cond_t *out_c_pro = malloc(sizeof(pthread_cond_t));
     pthread_cond_t *out_c_cons = malloc(sizeof(pthread_cond_t));
+    pthread_mutex_t *out_m = malloc(sizeof(pthread_mutex_t));
+    pthread_cond_init(out_c_pro, NULL);
+    pthread_cond_init(out_c_cons, NULL);
+    pthread_mutex_init(out_m, NULL);
     ComparatorPackage p_next;
     p_next.buffer = out_buffer;
     p_next.c_cons = out_c_cons;
     p_next.c_pro = out_c_pro;
-    p_next.num = &out_num;
+    p_next.num = out_num;
+    p_next.m = out_m;
     while (1)
     {
-
+        fprintf(stderr, "c2");
         pthread_mutex_lock(p_receive->m);
         if (*num > buffer_size)
-            exit(1);     /* overflow */
-        while (num == 0) /* block if buffer is full */
+            exit(1);
+        while (*num == 0)
             pthread_cond_wait(p_receive->c_cons, p_receive->m);
         current_value = p_receive->buffer[receive_pos];
         receive_pos = (receive_pos + 1) % buffer_size;
@@ -141,7 +146,7 @@ void *comparator(void *p)
         }
         case NORMAL_COMPARE:
         {
-            pthread_create(&thread, &attr, comparator, (void *)&p_next);
+            pthread_create(&thread, &attr, comparator, &p_next);
             if (current_value == -1)
             {
                 state = END;
@@ -182,7 +187,7 @@ void *generator(void *p)
     int length = *(int *)p;
     int *buffer = malloc(sizeof(int) * buffer_size);
     int next_out = 0;
-    int num = 0;
+    int num = 0;//represent current number in buffer
 
     pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t c_cons = PTHREAD_COND_INITIALIZER;
@@ -239,13 +244,13 @@ int main(int argc, char *argv[])
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-    sem_init(&end, 0, 0);
+
     int l = length;
 
     clock_gettime(CLOCK_MONOTONIC, &before);
 
     pthread_create(&thread, &attr, generator, &l);
-    sem_wait(&end);
+
     clock_gettime(CLOCK_MONOTONIC, &after);
     double time = (double)(after.tv_sec - before.tv_sec) +
                   (double)(after.tv_nsec - before.tv_nsec) / 1e9;
