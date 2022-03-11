@@ -6,91 +6,168 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include <sys/time.h>
-// #include "pipesort.h"
+typedef struct
+{
+    pthread_mutex_t *m;
+    int *num;
+    int *buffer;
+    pthread_cond_t *c_pro;
+    pthread_cond_t *c_cons;
+} ComparatorPackage;
+
 enum
 {
     INITIALIZE,
-    COMPARE,
+    RECEIVE_BEFORE_SUCCESSOR,
+    NORMAL_COMPARE,
     END
 } State;
+
 // global thread attributes
 pthread_attr_t attr;
 pthread_t thread;
-// size of bounded buffer between threads
 int buffer_size = 1;
-int add = 0; /* place to add next element */
-int rem = 0; /* place to remove next element */
-int num = 0;
-pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;    /* mutex lock for buffer */
-pthread_cond_t c_cons = PTHREAD_COND_INITIALIZER; /* consumer waits on this cond var */
-pthread_cond_t c_prod = PTHREAD_COND_INITIALIZER; /* producer waits on this cond var */
-sem_t sort;
-void *successor(void *p)
+
+int push_buffer(int *buffer, pthread_mutex_t *m, pthread_cond_t *c_cons, pthread_cond_t *c_pro, int value, int *num, int pos)
 {
+    pthread_mutex_lock(m);
+    if (*num > buffer_size)
+        exit(1);
+    while (*num == buffer_size)
+        pthread_cond_wait(c_pro, m);
+    buffer[pos] = value;
+    pos = (pos + 1) % buffer_size;
+    (*num)--;
+    pthread_cond_signal(c_cons);
+    pthread_mutex_unlock(m);
+    return pos;
 }
-void *comparator(void *p)
+void *output(void *p)
 {
-    int *receive_buffer = (int *)p;
-    int receive_pos = 0;
-    int receive_buffer_num = 0;
-    int out_buffer_num = 0;
-    int *out_buffer = malloc(sizeof(int) * buffer_size);
-    int out_pos = 0;
-    int store;
+    // no producer in this thread
+    ComparatorPackage *p_receive = (ComparatorPackage *)p;
     int current_value;
+    int receive_pos;
+    int *num = p_receive->num;
     int state = INITIALIZE;
     while (1)
     {
-        // get the value from buffer
-        pthread_mutex_lock(&m);
-        if (receive_buffer_num > buffer_size)
-            exit(1);                              /* overflow */
-        while (receive_buffer_num == buffer_size) /* block if buffer is full */
-            pthread_cond_wait(&c_cons, &m);
-        current_value = receive_buffer[receive_pos];
+        pthread_mutex_lock(p_receive->m);
+        if (*num > buffer_size)
+            exit(1);      /* overflow */
+        while (*num == 0) /* block if buffer is full */
+            pthread_cond_wait(p_receive->c_cons, p_receive->m);
+        current_value = p_receive->buffer[receive_pos];
         receive_pos = (receive_pos + 1) % buffer_size;
-        receive_buffer_num++;
-        pthread_mutex_unlock(&m);
-        pthread_cond_signal(&c_cons);
+        (*num)--;
+        pthread_mutex_unlock(p_receive->m);
+        pthread_cond_signal(p_receive->c_pro);
 
+        if (current_value == -1)
+        {
+            if (state == INITIALIZE)
+            {
+                state = END;
+                continue;
+            }
+            else
+            {
+                break;
+            }
+        }
+        printf("%i  ", current_value);
+    }
+}
+void *comparator(void *p)
+{
+    ComparatorPackage *p_receive = (ComparatorPackage *)p;
+    int receive_pos = 0;
+    int *num = p_receive->num;
+    int *out_buffer = malloc(sizeof(int) * buffer_size);
+    int out_num = *num;
+    int out_pos = 0;
+    int store; // local store data
+    int current_value;
+    int state = INITIALIZE; // first state
+    pthread_cond_t *out_c_pro = malloc(sizeof(pthread_cond_t));
+    pthread_cond_t *out_c_cons = malloc(sizeof(pthread_cond_t));
+    ComparatorPackage p_next;
+    p_next.buffer = out_buffer;
+    p_next.c_cons = out_c_cons;
+    p_next.c_pro = out_c_pro;
+    p_next.num = &out_num;
+    while (1)
+    {
+
+        pthread_mutex_lock(p_receive->m);
+        if (*num > buffer_size)
+            exit(1);     /* overflow */
+        while (num == 0) /* block if buffer is full */
+            pthread_cond_wait(p_receive->c_cons, p_receive->m);
+        current_value = p_receive->buffer[receive_pos];
+        receive_pos = (receive_pos + 1) % buffer_size;
+        (*num)--;
+        pthread_mutex_unlock(p_receive->m);
+        pthread_cond_signal(p_receive->c_pro);
         switch (state)
         {
         case INITIALIZE:
             store = current_value;
-            state = COMPARE;
+            state = NORMAL_COMPARE;
             break;
-        case COMPARE:
-            pthread_create(&thread, &attr, comparator, (void*)&out_buffer);
+        case RECEIVE_BEFORE_SUCCESSOR:
+        {
+            if (current_value == -1)
+            {
+                pthread_create(&thread, &attr, output, &p_next);
+                state = END;
+                out_pos = push_buffer(p_next.buffer, p_next.m, p_next.c_cons, p_next.c_pro, current_value, p_next.num, out_pos);
+                out_pos = push_buffer(p_next.buffer, p_next.m, p_next.c_cons, p_next.c_pro, store, p_next.num, out_pos);
+                continue;
+            }
+            pthread_create(&thread, &attr, comparator, &p_next);
+            state = NORMAL_COMPARE;
             if (store > current_value)
             {
-                pthread_mutex_lock(&m);
-                if (out_buffer_num > buffer_size)
-                    exit(1);
-                while (out_buffer_num == buffer_size)
-                    pthread_cond_wait(&c_prod, &m);
-                out_buffer[out_pos] = current_value;
-                out_pos = (out_pos + 1) % buffer_size;
-                out_buffer_num++;
-                pthread_cond_signal(&c_cons);
-                pthread_mutex_unlock(&m);
+                out_pos = push_buffer(p_next.buffer, p_next.m, p_next.c_cons, p_next.c_pro, current_value, p_next.num, out_pos);
             }
             else
             {
-                pthread_mutex_lock(&m);
-                if (out_buffer_num > buffer_size)
-                    exit(1);
-                while (out_buffer_num == buffer_size)
-                    pthread_cond_wait(&c_prod, &m);
-                out_buffer[out_pos] = store;
-                out_pos = (out_pos + 1) % buffer_size;
-                out_buffer_num++;
-                pthread_cond_signal(&c_cons);
-                pthread_mutex_unlock(&m);
+                out_pos = push_buffer(p_next.buffer, p_next.m, p_next.c_cons, p_next.c_pro, store, p_next.num, out_pos);
+                store = current_value;
+            }
+        }
+        case NORMAL_COMPARE:
+        {
+            pthread_create(&thread, &attr, comparator, (void *)&p_next);
+            if (current_value == -1)
+            {
+                state = END;
+                out_pos = push_buffer(p_next.buffer, p_next.m, p_next.c_cons, p_next.c_pro, current_value, p_next.num, out_pos);
+                out_pos = push_buffer(p_next.buffer, p_next.m, p_next.c_cons, p_next.c_pro, store, p_next.num, out_pos);
+                store = current_value;
+                continue;
+            }
+            if (store > current_value)
+            {
+                out_pos = push_buffer(p_next.buffer, p_next.m, p_next.c_cons, p_next.c_pro, current_value, p_next.num, out_pos);
+            }
+            else
+            {
+                out_pos = push_buffer(p_next.buffer, p_next.m, p_next.c_cons, p_next.c_pro, store, p_next.num, out_pos);
                 store = current_value;
             }
             break;
+        }
         case END:
+        {
+            out_pos = push_buffer(p_next.buffer, p_next.m, p_next.c_cons, p_next.c_pro, current_value, p_next.num, out_pos);
+            if (current_value == -1)
+            {
+                break;
+            }
             break;
+        }
         default:
             break;
         }
@@ -99,41 +176,39 @@ void *comparator(void *p)
 
 void *generator(void *p)
 {
-    // create buffer
-    int *buffer = malloc(sizeof(int) * buffer_size);
-    // create counter to write to buffer
-    int next_in = 0;
     long length = (long)p;
-    pthread_create(&thread, &attr, comparator, (void *)&buffer);
+    int *buffer = malloc(sizeof(int) * buffer_size);
+    int next_in = 0;
+    int num = 0;
+
+    pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    pthread_cond_t c_cons = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t c_pro = PTHREAD_COND_INITIALIZER;
+    ComparatorPackage p_next;
+    p_next.buffer = buffer;
+    p_next.c_cons = &c_cons;
+    p_next.c_pro = &c_pro;
+    p_next.num = &num;
+    p_next.m = &m;
+    pthread_create(&thread, &attr, comparator, &p_next);
 
     for (int i = 0; i < length; i++)
     {
-        pthread_mutex_lock(&m);
-        if (num > buffer_size)
-            exit(1);               /* overflow */
-        while (num == buffer_size) /* block if buffer is full */
-            pthread_cond_wait(&c_prod, &m);
-        /* if executing here, buffer not full so add element */
-        buffer[next_in] = rand();
-        next_in = (next_in + 1) % buffer_size;
-        num++;
-        pthread_cond_signal(&c_cons);
-        pthread_mutex_unlock(&m);
+        push_buffer(p_next.buffer, p_next.m, p_next.c_cons, p_next.c_pro, rand(), p_next.num, next_in);
+        // pthread_mutex_lock(&m);
+        // if (num > buffer_size)
+        //     exit(1);
+        // while (num == buffer_size) /* block if buffer is full */
+        //     pthread_cond_wait(&c_pro, &m);
+        // buffer[next_in] = rand();
+        // next_in = (next_in + 1) % buffer_size;
+        // num++;
+        // pthread_cond_signal(&c_cons);
+        // pthread_mutex_unlock(&m);
     }
-    num = 0;
     for (int i = 0; i < 2; i++)
     {
-        pthread_mutex_lock(&m);
-        if (num > buffer_size)
-            exit(1);               /* overflow */
-        while (num == buffer_size) /* block if buffer is full */
-            pthread_cond_wait(&c_prod, &m);
-        /* if executing here, buffer not full so add element */
-        buffer[next_in] = -1;
-        next_in = (next_in + 1) % buffer_size;
-        num++;
-        pthread_cond_signal(&c_cons);
-        pthread_mutex_unlock(&m);
+        push_buffer(p_next.buffer, p_next.m, p_next.c_cons, p_next.c_pro, -1, p_next.num, next_in);
     }
 }
 int main(int argc, char *argv[])
@@ -166,19 +241,14 @@ int main(int argc, char *argv[])
 
     /* Seed such that we can always reproduce the same random vector */
     srand(seed);
-
-    clock_gettime(CLOCK_MONOTONIC, &before);
-    /* Do your thing here */
-
     // initialize pthread attributes
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     long l = length;
-    sem_init(&sort, 0, 0);
-    pthread_create(&thread, &attr, generator, (void *)l);
-    sem_wait(&sort);
-    /* Do your thing here */
+
+    clock_gettime(CLOCK_MONOTONIC, &before);
+    pthread_create(&thread, &attr, generator, &l);
     clock_gettime(CLOCK_MONOTONIC, &after);
     double time = (double)(after.tv_sec - before.tv_sec) +
                   (double)(after.tv_nsec - before.tv_nsec) / 1e9;
