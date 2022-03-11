@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include <sys/time.h>
-sem_t end;
 typedef struct
 {
     pthread_mutex_t *m;
@@ -78,7 +77,6 @@ void *output(void *p)
         }
         printf("%i\n", current_value);
     }
-    sem_post(&end);
 }
 void *comparator(void *p)
 {
@@ -239,13 +237,11 @@ int main(int argc, char *argv[])
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-    sem_init(&end, 0, 0);
     int l = length;
 
     clock_gettime(CLOCK_MONOTONIC, &before);
 
     pthread_create(&thread, &attr, generator, &l);
-    sem_wait(&end);
     clock_gettime(CLOCK_MONOTONIC, &after);
     double time = (double)(after.tv_sec - before.tv_sec) +
                   (double)(after.tv_nsec - before.tv_nsec) / 1e9;
