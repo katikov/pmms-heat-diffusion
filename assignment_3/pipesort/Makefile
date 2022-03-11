@@ -19,7 +19,7 @@ $(PRJ): $(OBJ)
 	$(CC) $(CFLAGS) $(INCLUDES) $(OBJ) -o $@
 
 %.o: %.c
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@ $(LIB)	
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@ $(LIB) 	
 
 clean:
 	-rm -f $(OBJ) $(PRJ)

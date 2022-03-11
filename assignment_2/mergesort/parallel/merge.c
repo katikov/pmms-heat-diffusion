@@ -4,17 +4,142 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <string.h>
+#include <stdbool.h>
 #include <omp.h>
+#define max(a,b) (a)>=(b)?(a):(b)
+#define min(a,b) (a)<=(b)?(a):(b)
 
 /* Ordering of the vector */
 typedef enum Ordering {ASCENDING, DESCENDING, RANDOM} Order;
 
 int debug = 0;
+int num_threads = 1;
 
-/* Sort vector v of l elements using mergesort */
-void msort(int *v, long l){
+void inline merge(int *a, int *b, int *mid_b, long num_lhs, long num_rhs, long l){
+    long i=0,j=0;
+    for(long k = 0; k < l; k++) {
+        if (i < num_lhs && (j >= num_rhs || b[i] <= mid_b[j])) {
+            a[k] = b[i];
+            i++;
+        } else {
+            a[k] = mid_b[j];
+            j++;
+        }
+    }
 
 }
+void top_down_mergesort(int *b, long l, int *a){
+    if(l<=1)
+        return;
+    long num_rhs = l/2;
+    long num_lhs = l-num_rhs;
+    int *mid_a = a+num_lhs;
+    int *mid_b = b+num_lhs;
+    top_down_mergesort(a, num_lhs, b);
+    top_down_mergesort(mid_a, num_rhs, mid_b);
+    merge(a, b, mid_b, num_lhs, num_rhs, l);
+}
+
+long threshold = 16384;
+//const int threshold = 8192;
+
+long inline binary_search(int *a, long len, int r){
+    long L=0,R=len-1;
+    long ans=0;
+    while(L<=R){
+        long mid = (L+R)/2;
+        if(a[mid]<=r){
+            ans=mid+1;
+            L=mid+1;
+        }else{
+            R=mid-1;
+        }
+    }
+    return ans;
+}
+
+void merge_parallel(int *a, int *b, int *c, long num_lhs, long num_rhs){
+    long l = num_lhs + num_rhs;
+    if(l<=threshold){
+        merge(a,b,c,num_lhs,num_rhs,l);
+        return;
+    }
+    if(num_lhs<num_rhs){
+        int* temp=b;
+        b=c;
+        c=temp;
+        long t=num_lhs;
+        num_lhs=num_rhs;
+        num_rhs=t;
+    }
+    long rb = num_lhs/2;
+    long rc = binary_search(c,num_rhs,b[rb-1]);
+    //printf("%d %d\n",rb,rc);
+    a[rb+rc-1] = b[rb-1];
+    #pragma omp task
+    {
+        merge_parallel(a,b,c,rb-1,rc);
+    }
+    #pragma omp task
+    {
+        merge_parallel(a+rb+rc,b+rb,c+rc,num_lhs-rb,num_rhs-rc);
+    }
+    #pragma omp taskwait
+
+
+}
+
+void top_down_mergesort_parallel(int *b, long l, int *a, bool flag){
+    if(l<=threshold) {
+        if(flag) memcpy(a,b,l*sizeof(int));
+        else memcpy(b,a,l*sizeof(int));
+        top_down_mergesort(b,l,a);
+        return;    
+    }else{
+        long num_rhs = l/2;
+        long num_lhs = l-num_rhs;
+        int *mid_a = a+num_lhs;
+        int *mid_b = b+num_lhs;
+        #pragma omp task
+        {
+            top_down_mergesort_parallel(a, num_lhs, b, !flag);
+        }
+        #pragma omp task
+        {
+            top_down_mergesort_parallel(mid_a, num_rhs, mid_b, !flag);
+        }
+        #pragma omp taskwait
+        merge_parallel(a, b, mid_b, num_lhs, num_rhs);
+        //merge(a, b, mid_b, num_lhs, num_rhs, l);
+
+    }
+
+}
+
+/* Sort vector v of l elements using mergesort */
+void msort(int *v, long l, int *b){
+
+    //memcpy(b,v,l*sizeof(int));
+    /*
+    int copy_threads = num_threads;
+    #pragma omp parallel for num_threads(copy_threads) if(num_threads>1)
+    for(int i=0;i<l;i++){
+        b[i]=v[i];
+    }
+    */
+    #pragma omp parallel
+    {
+        #pragma omp single
+        {
+            //if(debug)
+            top_down_mergesort_parallel(b,l,v,0);
+        }
+        
+    }
+    
+}
+
 
 void print_v(int *v, long l) {
     printf("\n");
@@ -32,15 +157,18 @@ int main(int argc, char **argv) {
     int c;
     int seed = 42;
     long length = 1e4;
-    int num_threads = 1;
+    
     Order order = ASCENDING;
     int *vector;
 
     struct timespec before, after;
 
     /* Read command-line options. */
-    while((c = getopt(argc, argv, "adrgp:l:s:")) != -1) {
+    while((c = getopt(argc, argv, "adrgp:l:s:t:")) != -1) {
         switch(c) {
+            case 't':
+                threshold = atol(optarg);
+                break;
             case 'a':
                 order = ASCENDING;
                 break;
@@ -61,6 +189,7 @@ int main(int argc, char **argv) {
                 break;
             case 'p':
                 num_threads = atoi(optarg);
+                omp_set_num_threads(num_threads);
                 break;
             case '?':
                 if(optopt == 'l' || optopt == 's') {
@@ -111,12 +240,19 @@ int main(int argc, char **argv) {
         print_v(vector, length);
     }
 
+    int *b = (int*)malloc(length*sizeof(int));
+    if(b == NULL) {
+        fprintf(stderr, "Malloc failed...\n");
+        exit(-1);
+    }
+
     clock_gettime(CLOCK_MONOTONIC, &before);
 
     /* Sort */
-    msort(vector, length);
+    msort(vector, length,b);
 
     clock_gettime(CLOCK_MONOTONIC, &after);
+    free(b);
     double time = (double)(after.tv_sec - before.tv_sec) +
                   (double)(after.tv_nsec - before.tv_nsec) / 1e9;
 
@@ -129,3 +265,9 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+/*
+export OMP_PROC_BIND=true
+export OMP_WAIT_POLICY=active
+export OMP_NUM_THREADS=4
+export OMP_PLACES=cores
+*/

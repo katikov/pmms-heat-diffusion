@@ -5,16 +5,70 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <omp.h>
+#include <memory.h>
 
 /* Ordering of the vector */
 typedef enum Ordering {ASCENDING, DESCENDING, RANDOM} Order;
 
 int debug = 0;
 
-/* Sort vector v of l elements using mergesort */
-void msort(int *v, long l){
+void top_down_mergesort(int *b, long l, int *a){
+    if(l<=1)
+        return;
+    long num_rhs = l/2;
+    long num_lhs = l-num_rhs;
+    int *mid_a = a+num_lhs;
+    int *mid_b = b+num_lhs;
+    top_down_mergesort(a, num_lhs, b);
+    top_down_mergesort(mid_a, num_rhs, mid_b);
+    long i=0,j=0;
+
+    for(long k = 0; k < l; k++) {
+        if (i < num_lhs && (j >= num_rhs || b[i] <= mid_b[j])) {
+            a[k] = b[i];
+            i++;
+        } else {
+            a[k] = mid_b[j];
+            j++;
+        }
+    }
 
 }
+/* Sort vector v of l elements using mergesort */
+void msort(int *v, long l, int *b){
+
+    memcpy(b,v,l*sizeof(int));
+    top_down_mergesort(b,l,v);
+}
+/*
+
+
+//  Left source half is A[ iBegin:iMiddle-1].
+// Right source half is A[iMiddle:iEnd-1   ].
+// Result is            B[ iBegin:iEnd-1   ].
+void TopDownMerge(A[], iBegin, iMiddle, iEnd, B[])
+{
+    i = iBegin, j = iMiddle;
+ 
+    // While there are elements in the left or right runs...
+    for (k = iBegin; k < iEnd; k++) {
+        // If left run head exists and is <= existing right run head.
+        if (i < iMiddle && (j >= iEnd || A[i] <= A[j])) {
+            B[k] = A[i];
+            i = i + 1;
+        } else {
+            B[k] = A[j];
+            j = j + 1;
+        }
+    }
+}
+
+void CopyArray(A[], iBegin, iEnd, B[])
+{
+    for (k = iBegin; k < iEnd; k++)
+        B[k] = A[k];
+}
+*/
 
 void print_v(int *v, long l) {
     printf("\n");
@@ -110,13 +164,19 @@ int main(int argc, char **argv) {
     if(debug) {
         print_v(vector, length);
     }
+    int *b = (int*)malloc(length*sizeof(int));
+    if(b == NULL) {
+        fprintf(stderr, "Malloc failed...\n");
+        exit(-1);
+    }
 
     clock_gettime(CLOCK_MONOTONIC, &before);
 
     /* Sort */
-    msort(vector, length);
+    msort(vector, length, b);
 
     clock_gettime(CLOCK_MONOTONIC, &after);
+    free(b);
     double time = (double)(after.tv_sec - before.tv_sec) +
                   (double)(after.tv_nsec - before.tv_nsec) / 1e9;
 

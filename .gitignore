@@ -2,3 +2,10 @@
 *.o
 
 assignment_3/histo/with_mutual_ex/histo_atomic/histo_atomic
+assignment_2/heat_omp/.vs/ProjectSettings.json
+assignment_2/heat_omp/.vs/heat_omp/v16/Browse.VC.opendb
+assignment_2/heat_omp/.vs/heat_omp/v16/Browse.VC.db-wal
+assignment_2/heat_omp/.vs/heat_omp/v16/Browse.VC.db-shm
+assignment_2/heat_omp/.vs/heat_omp/v16/Browse.VC.db
+assignment_2/heat_omp/.vs/heat_omp/v16/.suo
+assignment_2/heat_omp/.vs/slnx.sqlite
