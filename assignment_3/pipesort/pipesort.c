@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include <sys/time.h>
+sem_t end;
 typedef struct
 {
     pthread_mutex_t *m;
@@ -26,7 +27,7 @@ enum
 // global thread attributes
 pthread_attr_t attr;
 pthread_t thread;
-int buffer_size = 10;
+int buffer_size = 1;
 
 int push_buffer(int *buffer, pthread_mutex_t *m, pthread_cond_t *c_cons, pthread_cond_t *c_pro, int value, int *num, int pos)
 {
@@ -50,7 +51,6 @@ void *output(void *p)
     int receive_pos;
     int *num = p_receive->num;
     int state = INITIALIZE;
-    fprintf(stderr, "in out");
     while (1)
     {
         pthread_mutex_lock(p_receive->m);
@@ -78,6 +78,7 @@ void *output(void *p)
         }
         printf("%i\n", current_value);
     }
+    sem_post(&end);
 }
 void *comparator(void *p)
 {
@@ -177,7 +178,8 @@ void *comparator(void *p)
 
 void *generator(void *p)
 {
-    long length = (long)p;
+
+    int length = *(int *)p;
     int *buffer = malloc(sizeof(int) * buffer_size);
     int next_out = 0;
     int num = 0;
@@ -237,10 +239,13 @@ int main(int argc, char *argv[])
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-    long l = length;
+    sem_init(&end, 0, 0);
+    int l = length;
 
     clock_gettime(CLOCK_MONOTONIC, &before);
+
     pthread_create(&thread, &attr, generator, &l);
+    sem_wait(&end);
     clock_gettime(CLOCK_MONOTONIC, &after);
     double time = (double)(after.tv_sec - before.tv_sec) +
                   (double)(after.tv_nsec - before.tv_nsec) / 1e9;
