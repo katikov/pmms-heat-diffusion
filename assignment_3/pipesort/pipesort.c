@@ -244,19 +244,12 @@ int main(int argc, char *argv[])
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-<<<<<<< HEAD
-
-=======
->>>>>>> 65a0fb904c61457880ab7cf7117e6dcdec192144
     int l = length;
 
     clock_gettime(CLOCK_MONOTONIC, &before);
 
     pthread_create(&thread, &attr, generator, &l);
-<<<<<<< HEAD
 
-=======
->>>>>>> 65a0fb904c61457880ab7cf7117e6dcdec192144
     clock_gettime(CLOCK_MONOTONIC, &after);
     double time = (double)(after.tv_sec - before.tv_sec) +
                   (double)(after.tv_nsec - before.tv_nsec) / 1e9;
