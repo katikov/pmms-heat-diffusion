@@ -14,11 +14,7 @@
 #define END_FLAG -1
 #define MAX_THREADS 4080
 
-typedef enum Order {ASCENDING, DESCENDING, RANDOM} Order;
-typedef enum State{
-    COMPARE,
-    FORWARD
-} State;
+
 
 void die(const char *msg){
     if (errno != 0) 
@@ -35,21 +31,24 @@ typedef struct ComparatorPackage
     pthread_cond_t c_pro;
     pthread_cond_t c_cons;
     pthread_t thread;
-    int num;
-    struct ComparatorPackage* prev;
-    
+    int num;   // number of elements in buffer
+    struct ComparatorPackage* prev; // linked list, prev->thread is the predecessor
 } ComparatorPackage;
 
-Order order = RANDOM;
 pthread_attr_t attr;
 
 
 int buffer_size = 50;
 int length = 1e4;
+int debug = 1;
+
+// join the output thread in main
 ComparatorPackage* p_final = NULL;
 pthread_mutex_t final_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t final_cond = PTHREAD_COND_INITIALIZER;
 
+
+// total number of existing threads <= 4080
 int total_threads=0;
 pthread_mutex_t create_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t create_cond = PTHREAD_COND_INITIALIZER;
@@ -118,6 +117,18 @@ int pop_buffer(ComparatorPackage* p, int pos, int *value)
 }
 
 
+void print_v(int *v, long l) {
+    printf("\n");
+    for(long i = 0; i < l; i++) {
+        if(i != 0 && (i % 10 == 0)) {
+            printf("\n");
+        }
+        printf("%d ", v[i]);
+    }
+    printf("\n");
+}
+
+
 // output thread, only receive 1 EXIT
 void *output(void *p)
 {
@@ -126,14 +137,21 @@ void *output(void *p)
     
     int current_value;
     int next_in = 0;
+    int print_cnt = 0;
     for(;;)
     {
         next_in = pop_buffer(p_receive, next_in, &current_value);
         if (current_value == END_FLAG)
             break;
-        printf("%d ", current_value);
+        if(debug){
+            if(print_cnt!=0 && (print_cnt%10==0))
+                printf("\n");
+            printf("%d ", current_value);
+        }
+        print_cnt++;
     }
-    printf("\n");
+    if(debug)
+        printf("\n");
 
     deleteComparatorPackage(p_receive->prev);
 
@@ -154,8 +172,6 @@ void *comparator(void *p)
 
     int next_in = 0;
     int next_out = 0;
-
-
 
     int store; // store 1 integer local data
     int current_value; 
@@ -233,7 +249,7 @@ int main(int argc, char *argv[]){
 
 
     /* Read command-line options. */
-    while((c = getopt(argc, argv, "l:s:b:t:")) != -1) {
+    while((c = getopt(argc, argv, "l:s:b:t:g:")) != -1) {
         switch(c) {
             case 'l':
                 length = atol(optarg);
@@ -246,6 +262,9 @@ int main(int argc, char *argv[]){
                 break;
             case 't':
                 stack_size = atol(optarg);
+                break;
+            case 'g':
+                debug = atoi(optarg);
                 break;
             case '?':
                 fprintf(stderr, "Unknown option character '\\x%x'.\n", optopt);
