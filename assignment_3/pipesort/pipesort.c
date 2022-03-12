@@ -8,7 +8,11 @@
 #include <sys/time.h>
 #include <errno.h>
 
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+
 #define END_FLAG -1
+#define MAX_THREADS 4080
 
 typedef enum Order {ASCENDING, DESCENDING, RANDOM} Order;
 typedef enum State{
@@ -26,11 +30,13 @@ void die(const char *msg){
 
 typedef struct ComparatorPackage
 {
-    pthread_mutex_t *m;
+    pthread_mutex_t m;
     int *buffer;
-    pthread_cond_t *c_pro;
-    pthread_cond_t *c_cons;
+    pthread_cond_t c_pro;
+    pthread_cond_t c_cons;
+    pthread_t thread;
     int num;
+    struct ComparatorPackage* prev;
     
 } ComparatorPackage;
 
@@ -39,51 +45,75 @@ pthread_attr_t attr;
 
 
 int buffer_size = 50;
+int length = 1e4;
+ComparatorPackage* p_final = NULL;
+pthread_mutex_t final_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t final_cond = PTHREAD_COND_INITIALIZER;
 
+int total_threads=0;
+pthread_mutex_t create_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t create_cond = PTHREAD_COND_INITIALIZER;
 
-// ComparatorPackage* newComparatorPackage(){
-//     ComparatorPackage* res = malloc(sizeof(ComparatorPackage));
-//     if(res==NULL) die("malloc");
-//     res->buffer = malloc(sizeof(int) * buffer_size);
-//     if(res->buffer==NULL) die("malloc");
-//     pthread_mutex_init(&(res->m),NULL);
-//     pthread_cond_init(&(res->c_pro), NULL);
-//     pthread_cond_init(&(res->c_cons), NULL);
-//     res->num = 0;
-    
-//     return res;
-// }
+ComparatorPackage* newComparatorPackage(){
+    pthread_mutex_lock(&create_mutex);
+    while(total_threads>=MAX_THREADS)
+        pthread_cond_wait(&create_cond, &create_mutex);
+    total_threads++;
+    pthread_mutex_unlock(&create_mutex);
+
+    ComparatorPackage* res = malloc(sizeof(ComparatorPackage));
+    if(res==NULL) die("malloc");
+    res->buffer = malloc(sizeof(int) * buffer_size);
+    if(res->buffer==NULL) die("malloc");
+    pthread_mutex_init(&(res->m),NULL);
+    pthread_cond_init(&(res->c_pro), NULL);
+    pthread_cond_init(&(res->c_cons), NULL);
+    res->num = 0;
+    res->prev = NULL;
+    return res;
+}
+
+void deleteComparatorPackage(ComparatorPackage* p){
+    if(p->buffer) free(p->buffer);
+    void* res;
+    pthread_join(p->thread, &res);
+    free(p);
+    pthread_mutex_lock(&create_mutex);
+    total_threads--;
+    pthread_cond_signal(&create_cond);
+    pthread_mutex_unlock(&create_mutex);
+}
 
 int push_buffer(ComparatorPackage* p, int pos, int value)
 {
 
-    pthread_mutex_lock(p->m);
+    pthread_mutex_lock(&(p->m));
     if (p->num > buffer_size)
         die("buffer error");
     
     while (p->num >= buffer_size)
-        pthread_cond_wait(p->c_pro, p->m);
+        pthread_cond_wait(&(p->c_pro), &(p->m));
     p->buffer[pos] = value;
     pos = (pos + 1) % buffer_size;
     p->num++;
-    pthread_cond_signal(p->c_cons);
-    pthread_mutex_unlock(p->m);
+    pthread_cond_signal(&(p->c_cons));
+    pthread_mutex_unlock(&(p->m));
     return pos;
 }
 
 int pop_buffer(ComparatorPackage* p, int pos, int *value)
 {
 
-    pthread_mutex_lock(p->m);
+    pthread_mutex_lock(&(p->m));
     if (p->num > buffer_size)
         die("buffer error");
     while (p->num<= 0)
-        pthread_cond_wait(p->c_cons, p->m);
+        pthread_cond_wait(&(p->c_cons), &(p->m));
     *value = p->buffer[pos];
     pos = (pos + 1) % buffer_size;
     p->num--;
-    pthread_cond_signal(p->c_pro);
-    pthread_mutex_unlock(p->m);
+    pthread_cond_signal(&(p->c_pro));
+    pthread_mutex_unlock(&(p->m));
     return pos;
 }
 
@@ -93,6 +123,7 @@ void *output(void *p)
 {
     // no producer in this thread
     ComparatorPackage *p_receive = (ComparatorPackage *)p;
+    
     int current_value;
     int next_in = 0;
     for(;;)
@@ -103,28 +134,27 @@ void *output(void *p)
         printf("%d ", current_value);
     }
     printf("\n");
+
+    deleteComparatorPackage(p_receive->prev);
+
+    pthread_mutex_lock(&final_mutex);
+    p_final = p;
+    pthread_cond_signal(&final_cond);
+    pthread_mutex_unlock(&final_mutex);
     return NULL;
 }
+
 
 void *comparator(void *p)
 {
     ComparatorPackage *p_receive = (ComparatorPackage *)p;
+    ComparatorPackage *p_next = newComparatorPackage();
+    p_next->prev = p_receive;
 
 
-    int buffer[buffer_size];
     int next_in = 0;
     int next_out = 0;
 
-    pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t c_cons = PTHREAD_COND_INITIALIZER;
-    pthread_cond_t c_pro = PTHREAD_COND_INITIALIZER;
-    ComparatorPackage p_next;
-    p_next.buffer = buffer;
-    p_next.c_cons = &c_cons;
-    p_next.c_pro = &c_pro;
-    p_next.num = 0;
-    p_next.m = &m;
-    pthread_t thread;
 
 
     int store; // store 1 integer local data
@@ -142,72 +172,59 @@ void *comparator(void *p)
                 state = 1;
                 if(thread_created==0){ // create output
                     thread_created = 1;
-                    pthread_create(&thread, &attr, output, &p_next);
+                    pthread_create(&(p_next->thread), &attr, output, p_next);
                 }else{
-                    next_out = push_buffer(&p_next, next_out, current_value);
+                    next_out = push_buffer(p_next, next_out, current_value);
                 }
-                next_out = push_buffer(&p_next, next_out, store);
+                next_out = push_buffer(p_next, next_out, store);
             }else{ // compare and forward
                 if(thread_created==0){
                     thread_created = 1;
-                    pthread_create(&thread, &attr, comparator, &p_next);
+                    pthread_create(&(p_next->thread), &attr, comparator, p_next);
                 }
                 if(current_value>store){
                     int temp = store; store = current_value; current_value = temp;
                 }
-                next_out = push_buffer(&p_next, next_out, current_value);
+                next_out = push_buffer(p_next, next_out, current_value);
             }
         }else{ // forward mode
-            next_out = push_buffer(&p_next, next_out, current_value);
+            next_out = push_buffer(p_next, next_out, current_value);
             if(current_value == END_FLAG)// second end
                 break;
         }
 
     }
     void* result;
-    if(thread_created)
-        pthread_join(thread, &result);
+    deleteComparatorPackage(p_receive->prev);
     return NULL;
 }
 
 
 void *generator(void *p)
 {
+    ComparatorPackage *p_prev = p;
+    ComparatorPackage *p_next = newComparatorPackage();
+    p_next->prev = p_prev;
 
-    int length = *(int *)p;
-    int buffer[buffer_size];
     int next_out = 0;
 
-    pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t c_cons = PTHREAD_COND_INITIALIZER;
-    pthread_cond_t c_pro = PTHREAD_COND_INITIALIZER;
-    ComparatorPackage p_next;
-    p_next.buffer = buffer;
-    p_next.c_cons = &c_cons;
-    p_next.c_pro = &c_pro;
-    p_next.num = 0;
-    p_next.m = &m;
-    pthread_t thread;
-
-    pthread_create(&thread, &attr, comparator, &p_next);
-    //pthread_create(&thread, &attr, output, &p_next);
+    pthread_create(&(p_next->thread), &attr, comparator, p_next);
+    //pthread_create(&(p_next->thread), &attr, output, p_next);
 
     for (int i = 0; i < length; i++){
         int value = rand();
-        next_out = push_buffer(&p_next, next_out, value);
+        next_out = push_buffer(p_next, next_out, value);
     }
     for (int i = 0; i < 2; i++)
-        next_out = push_buffer(&p_next, next_out, END_FLAG);
+        next_out = push_buffer(p_next, next_out, END_FLAG);
 
-    void* result;
-    pthread_join(thread, &result);
     return NULL;
 }
 
 int main(int argc, char *argv[]){
     int c;
     int seed = 42;
-    long length = 1e4;
+    //long length = 1e4;
     long stack_size = 16384;
 
     struct timespec before;
@@ -238,6 +255,9 @@ int main(int argc, char *argv[]){
         }
     }
 
+    buffer_size = MAX(buffer_size, length/(MAX_THREADS-2));
+
+
     /* Seed such that we can always reproduce the same random vector */
     srand(seed);
 
@@ -245,15 +265,17 @@ int main(int argc, char *argv[]){
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     pthread_attr_setstacksize(&attr, stack_size);
     //pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-    int l = length;
 
     clock_gettime(CLOCK_MONOTONIC, &before);
 
-    pthread_t thread;
-    pthread_create(&thread, &attr, generator, &l);
-    void* result;
-    pthread_join(thread, &result);
+    ComparatorPackage *p = newComparatorPackage();
 
+    pthread_create(&(p->thread), &attr, generator, p);
+    pthread_mutex_lock(&final_mutex);
+    while(p_final == NULL)
+        pthread_cond_wait(&final_cond, &final_mutex);
+    deleteComparatorPackage(p_final);
+    pthread_mutex_unlock(&final_mutex);
 
     clock_gettime(CLOCK_MONOTONIC, &after);
     double time = (double)(after.tv_sec - before.tv_sec) +
