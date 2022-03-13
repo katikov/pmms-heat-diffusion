@@ -40,7 +40,7 @@ pthread_attr_t attr;
 
 int buffer_size = 50;
 int length = 1e4;
-int debug = 1;
+int debug = 0;
 
 // join the output thread in main
 ComparatorPackage* p_final = NULL;

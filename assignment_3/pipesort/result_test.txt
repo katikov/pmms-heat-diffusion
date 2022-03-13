@@ -1,0 +1,64 @@
+1 4090
+Pipesort took:  2.173455e+00 seconds 
+Pipesort took:  2.312895e+00 seconds 
+Pipesort took:  2.360759e+00 seconds 
+2 4090
+Pipesort took:  1.543083e+00 seconds 
+Pipesort took:  1.495675e+00 seconds 
+Pipesort took:  1.467409e+00 seconds 
+4 4090
+Pipesort took:  1.038250e+00 seconds 
+Pipesort took:  1.048659e+00 seconds 
+Pipesort took:  1.120980e+00 seconds 
+8 4090
+Pipesort took:  9.237222e-01 seconds 
+Pipesort took:  9.195574e-01 seconds 
+Pipesort took:  7.621086e-01 seconds 
+16 4090
+Pipesort took:  7.250983e-01 seconds 
+Pipesort took:  7.370936e-01 seconds 
+Pipesort took:  8.245445e-01 seconds 
+32 4090
+Pipesort took:  6.322558e-01 seconds 
+Pipesort took:  5.223466e-01 seconds 
+Pipesort took:  6.252978e-01 seconds 
+50 4090
+Pipesort took:  6.406655e-01 seconds 
+Pipesort took:  5.079417e-01 seconds 
+Pipesort took:  6.742243e-01 seconds 
+64 4090
+Pipesort took:  5.453154e-01 seconds 
+Pipesort took:  6.091873e-01 seconds 
+Pipesort took:  5.663505e-01 seconds 
+100 4090
+Pipesort took:  4.474231e-01 seconds 
+Pipesort took:  3.592612e-01 seconds 
+Pipesort took:  5.911823e-01 seconds 
+200 4090
+Pipesort took:  2.831751e-01 seconds 
+Pipesort took:  3.798201e-01 seconds 
+Pipesort took:  2.799540e-01 seconds 
+500 4090
+Pipesort took:  2.702700e-01 seconds 
+Pipesort took:  3.043438e-01 seconds 
+Pipesort took:  2.685956e-01 seconds 
+700 4090
+Pipesort took:  2.778151e-01 seconds 
+Pipesort took:  2.784966e-01 seconds 
+Pipesort took:  2.791450e-01 seconds 
+1000 4090
+Pipesort took:  2.791768e-01 seconds 
+Pipesort took:  2.766216e-01 seconds 
+Pipesort took:  2.673648e-01 seconds 
+2000 4090
+Pipesort took:  2.678049e-01 seconds 
+Pipesort took:  2.679345e-01 seconds 
+Pipesort took:  2.729648e-01 seconds 
+4000 4090
+Pipesort took:  2.713279e-01 seconds 
+Pipesort took:  2.773589e-01 seconds 
+Pipesort took:  2.640467e-01 seconds 
+8000 4090
+Pipesort took:  2.729861e-01 seconds 
+Pipesort took:  2.730353e-01 seconds 
+Pipesort took:  2.727444e-01 seconds 
