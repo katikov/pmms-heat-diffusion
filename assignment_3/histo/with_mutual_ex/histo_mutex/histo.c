@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <errno.h>
+#include <pthread.h>
+
 
 void die(const char *msg){
     if (errno != 0) 
@@ -74,8 +76,28 @@ void print_image(int num_rows, int num_cols, int * image){
 	printf("\n");
 }
 
-void histogram(int * histo, int * image){
-    //TODO: For Students
+typedef struct histo_thread_params
+{
+    int* data_start; // start of the sequence chunk
+    int* data_end; // end of the sequence chunk
+    int* histo; // min and max range element values
+} histo_thread_params;
+
+pthread_mutex_t histo_mutex;
+void* histogram(void* tparams){
+    histo_thread_params* params = (histo_thread_params*)tparams;
+    int* image_start = params->data_start;
+    int* image_end = params->data_end;
+    int* histo = params->histo;
+
+    int* iter = image_start;
+    while(iter < image_end) {
+        pthread_mutex_lock(&histo_mutex);
+            histo[*iter] += 1; 
+        pthread_mutex_unlock(&histo_mutex);
+        ++iter;
+    }
+    pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[]){
@@ -127,6 +149,8 @@ int main(int argc, char *argv[]){
     }
 
     int * image = (int *) malloc(sizeof(int) * num_cols * num_rows);
+    int* counts = (int*)malloc(sizeof(int) * num_threads);
+    int* image_start = image;
 
     /* Seed such that we can always reproduce the same random vector */
     if (gen_image){
@@ -136,11 +160,28 @@ int main(int argc, char *argv[]){
     	read_image(image_path,num_rows, num_cols, image);
     }
 
+    // Threading Boilerplate
+    histo_thread_params* args = malloc(num_threads * sizeof(*args));
+    pthread_t threads[num_threads];
+    int excess = (num_cols * num_rows) % num_threads;
+    int base = (num_cols * num_rows) / num_threads;
+    for (int i = 0; i < num_threads; ++i) {
+        counts[i] = base + (i < excess?1:0);
+    }
+
     clock_gettime(CLOCK_MONOTONIC, &before);
     /* Do your thing here */
-
-
-    histogram(histo, image);
+    for (int i = 0; i < num_threads; ++i){
+        args[i] = (histo_thread_params){
+            .data_start = image_start,
+            .data_end = image_start + counts[i],
+            .histo = histo
+            };
+        image_start += counts[i];
+        pthread_create(&threads[i], NULL, histogram, (void*)&args[i]);
+        }
+    for (int i = 0; i < num_threads; ++i)
+        pthread_join(threads[i], NULL);
 
     /* Do your thing here */
 
@@ -153,4 +194,5 @@ int main(int argc, char *argv[]){
                   (double)(after.tv_nsec - before.tv_nsec) / 1e9;
 
     printf("Histo took: % .6e seconds \n", time);
+    //print_histo(histo);
 }
