@@ -1,4 +1,10 @@
 .idea/*
 *.o
 
-assignment_3/histo/with_mutual_ex/histo_atomic/histo_atomic
+.vs/pmms-heat-diffusion/v16/.suo
+.vs/pmms-heat-diffusion/v16/Browse.VC.db
+.vs/pmms-heat-diffusion/v16/Browse.VC.db-shm
+.vs/pmms-heat-diffusion/v16/Browse.VC.db-wal
+.vs/pmms-heat-diffusion/v16/Browse.VC.opendb
+.vs/ProjectSettings.json
+.vs/slnx.sqlite
