@@ -161,6 +161,9 @@ int main(int argc, char *argv[]){
     }
 
     // Threading Boilerplate
+    pthread_attr_t attr;
+    pthread_attr_init ( &attr ); 
+    pthread_attr_setscope ( &attr , PTHREAD_SCOPE_SYSTEM );
     histo_thread_params* args = malloc(num_threads * sizeof(*args));
     pthread_t threads[num_threads];
     int excess = (num_cols * num_rows) % num_threads;
@@ -178,7 +181,7 @@ int main(int argc, char *argv[]){
             .histo = histo
             };
         image_start += counts[i];
-        pthread_create(&threads[i], NULL, histogram, (void*)&args[i]);
+        pthread_create(&threads[i], &attr,histogram, (void*)&args[i]);
         }
     for (int i = 0; i < num_threads; ++i)
         pthread_join(threads[i], NULL);
