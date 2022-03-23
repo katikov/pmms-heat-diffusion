@@ -75,12 +75,37 @@ static void checkCudaCall(cudaError_t result) {
 
 __global__ void histogramKernel(unsigned char* image, long img_size, unsigned int* histogram, int hist_size) {
 // insert operation here
+    int blockThreadIdx = threadIdx.x;
+    long imageThreadIdx = threadIdx.x + blockDim.x * blockIdx.x;
+    extern __shared__ unsigned int myHisto[]; // 256
 
+    if(blockThreadIdx < hist_size){
+        myHisto[blockThreadIdx] = 0;
+    }
+    __syncthreads();
+    if(imageThreadIdx < img_size){
+        atomicAdd(&myHisto[image[imageThreadIdx]], 1);
+    }
+    __syncthreads();
+    if(blockThreadIdx < hist_size){
+        // process the task block by block
+        histogram = histogram + hist_size * blockIdx.x;
+        histogram[blockThreadIdx] = myHisto[blockThreadIdx];
+    }
+}
+
+__global__ void reduceHistogramKernel(unsigned int* histogram, int stride, int endBlock, int hist_size) {
+    long blockThreadIdx = threadIdx.x;
+    if(stride + blockIdx.x < endBlock) {
+        int currThread = hist_size * blockIdx.x + blockThreadIdx;
+        int nextThread = hist_size * ( blockIdx.x + stride) + blockThreadIdx;
+        histogram[currThread] += histogram[nextThread];
+    }
 }
 
 void histogramCuda(unsigned char* image, long img_size, unsigned int* histogram, int hist_size) {
     int threadBlockSize = 512;
-
+    int numOfBlock = img_size%threadBlockSize==0 ? img_size/threadBlockSize : img_size/threadBlockSize+1;//30
     // allocate the vectors on the GPU
     unsigned char* deviceImage = NULL;
     checkCudaCall(cudaMalloc((void **) &deviceImage, img_size * sizeof(unsigned char)));
@@ -89,7 +114,7 @@ void histogramCuda(unsigned char* image, long img_size, unsigned int* histogram,
         return;
     }
     unsigned int* deviceHisto = NULL;
-    checkCudaCall(cudaMalloc((void **) &deviceHisto, hist_size * sizeof(unsigned int)));
+    checkCudaCall(cudaMalloc((void **) &deviceHisto, numOfBlock*hist_size * sizeof(unsigned int)));
     if (deviceHisto == NULL) {
         checkCudaCall(cudaFree(deviceImage));
         cout << "could not allocate memory!" << endl;
@@ -105,14 +130,28 @@ void histogramCuda(unsigned char* image, long img_size, unsigned int* histogram,
     memoryTime.stop();
 
     // execute kernel
+    int shared_memo = hist_size * sizeof(int); /* the size of shared memory has to be the multiple of n and sizeof(int)*/
     kernelTime1.start();
-    histogramKernel<<<img_size/threadBlockSize, threadBlockSize>>>(deviceImage, img_size, deviceHisto, hist_size);
+    histogramKernel<<<numOfBlock, threadBlockSize, shared_memo>>>(deviceImage, img_size, deviceHisto, hist_size);
     cudaDeviceSynchronize();
     kernelTime1.stop();
 
     // check whether the kernel invocation was successful
     checkCudaCall(cudaGetLastError());
+    /* reduce multiple histograms to one histogram */
+    int stride = ceil((double)numOfBlock/2);
+    int endBlock = numOfBlock;
 
+    while(endBlock > 1){
+        kernelTime1.start();
+        reduceHistogramKernel<<<endBlock-stride, hist_size>>>(deviceHisto, stride, endBlock, hist_size);
+        cudaDeviceSynchronize();
+        kernelTime1.stop();
+        checkCudaCall(cudaGetLastError());
+        
+        endBlock = stride;
+        stride = ceil((double)stride/2);
+    }
     // copy result back
     memoryTime.start();
     checkCudaCall(cudaMemcpy(histogram, deviceHisto, hist_size * sizeof(unsigned int), cudaMemcpyDeviceToHost));
@@ -123,6 +162,7 @@ void histogramCuda(unsigned char* image, long img_size, unsigned int* histogram,
 
     cout << "histogram (kernel): \t\t" << kernelTime1  << endl;
     cout << "histogram (memory): \t\t" << memoryTime << endl;
+    cout << "histogram (total):  \t\t  = " << (kernelTime1.getTimeInSeconds() + memoryTime.getTimeInSeconds()) << " seconds" << endl;
 }
 
 void histogramSeq(unsigned char* image, long img_size, unsigned int* histogram, int hist_size) {
