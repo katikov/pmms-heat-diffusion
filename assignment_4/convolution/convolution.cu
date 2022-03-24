@@ -46,7 +46,18 @@ void convolutionSeq(float *output, float *input, float *filter) {
 
 
 __global__ void convolution_kernel_naive(float *output, float *input, float *filter) {
-
+    unsigned y = blockIdx.y*blockDim.y + threadIdx.y;
+    unsigned x = blockIdx.x*blockDim.x + threadIdx.x;
+    unsigned idx = y*input_width+x;
+    if(x<image_width && y<image_height){
+        double res = 0.0;
+        for(int i=0;i<filter_height;i++){
+            for(int j=0;j<filter_width;j++){
+                res += input[idx+i*input_width+j] * filter[i*filter_width+j];
+            }
+        }
+        output[y*image_width+x] = res/35.0;
+    }
 }
 
 void convolutionCUDA(float *output, float *input, float *filter) {
