@@ -154,7 +154,9 @@ void histogramCuda(unsigned char *image, long img_size, unsigned int *histogram,
             if (cudaStatus != cudaSuccess) {
                 fprintf(stderr, "dev_inputPixels[%d] cudaMemcpyAsync failed!\n", i);
             }
-            histogramKernel<<<blocks/128, threadBlockSize, 0, streams[i]>>>(&deviceImage[i * blocks], img_size_sub, deviceHisto, hist_size);
+            int inputBlock = blocks/threadBlockSize/128;
+            inputBlock = inputBlock==0 ? 1 :inputBlock;
+            histogramKernel<<<inputBlock, threadBlockSize, 0, streams[i]>>>(&deviceImage[i * blocks], img_size_sub, deviceHisto, hist_size);
         }
     }
     cudaDeviceSynchronize();
