@@ -83,8 +83,12 @@ __global__ void histogramKernel(unsigned char* image, long img_size, unsigned in
         myHisto[blockThreadIdx] = 0;
     }
     __syncthreads();
-    if(imageThreadIdx < img_size){
-        atomicAdd(&myHisto[image[imageThreadIdx]], 1);
+    // if(imageThreadIdx < img_size){
+    //     atomicAdd(&myHisto[image[imageThreadIdx]], 1);
+    // }
+    for (int i = imageThreadIdx; i < img_size; i += (gridDim.x * blockDim.x))
+    {
+        atomicAdd(&myHisto[image[i]], 1);
     }
     __syncthreads();
     if(blockThreadIdx < hist_size){
@@ -105,7 +109,8 @@ __global__ void reduceHistogramKernel(unsigned int* histogram, int stride, int e
 
 void histogramCuda(unsigned char* image, long img_size, unsigned int* histogram, int hist_size) {
     int threadBlockSize = 512;
-    int numOfBlock = img_size%threadBlockSize==0 ? img_size/threadBlockSize : img_size/threadBlockSize+1;//30
+    // int numOfBlock = img_size%threadBlockSize==0 ? img_size/threadBlockSize : img_size/threadBlockSize+1;
+    int numOfBlock = img_size/threadBlockSize/128 != 0 ? img_size/threadBlockSize/128 : 1;
     // allocate the vectors on the GPU
     unsigned char* deviceImage = NULL;
     checkCudaCall(cudaMalloc((void **) &deviceImage, img_size * sizeof(unsigned char)));

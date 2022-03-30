@@ -145,7 +145,7 @@ void histogramCuda(unsigned char *image, long img_size, unsigned int *histogram,
 
     // execute kernel
     kernelTime1.start();
-    histogramKernel<<<img_size / threadBlockSize, threadBlockSize>>>(deviceImage, img_size, deviceHisto, hist_size);
+    histogramKernel<<<(img_size / threadBlockSize / 128)+1, threadBlockSize>>>(deviceImage, img_size, deviceHisto, hist_size);
     cudaDeviceSynchronize();
     kernelTime1.stop();
 
@@ -162,6 +162,7 @@ void histogramCuda(unsigned char *image, long img_size, unsigned int *histogram,
 
     cout << "histogram (kernel): \t\t" << kernelTime1 << endl;
     cout << "histogram (memory): \t\t" << memoryTime << endl;
+    cout << "histogram (total):  \t\t  = " << (kernelTime1.getTimeInSeconds() + memoryTime.getTimeInSeconds()) << " seconds" << endl;
 }
 
 void histogramSeq(unsigned char *image, long img_size, unsigned int *histogram, int hist_size)

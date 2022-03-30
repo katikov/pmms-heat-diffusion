@@ -8,7 +8,7 @@
 #include <getopt.h>
 
 using namespace std;
-#define STREAM_COUNT 128
+#define STREAM_COUNT 3
 
 /* Utility function, use to do error checking.
 
