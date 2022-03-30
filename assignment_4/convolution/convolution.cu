@@ -50,7 +50,7 @@ __global__ void convolution_kernel_naive(float *output, float *input, float *fil
     unsigned x = blockIdx.x*blockDim.x + threadIdx.x;
     unsigned idx = y*input_width+x;
     if(x<image_width && y<image_height){
-        double res = 0.0;
+        float res = 0.0;
         for(int i=0;i<filter_height;i++){
             for(int j=0;j<filter_width;j++){
                 res += input[idx+i*input_width+j] * filter[i*filter_width+j];
@@ -65,7 +65,22 @@ __global__ void convolution_kernel_constant(float *output, float *input) {
     unsigned x = blockIdx.x*blockDim.x + threadIdx.x;
     unsigned idx = y*input_width+x;
     if(x<image_width && y<image_height){
-        double res = 0.0;
+        float res = 0.0;
+        for(int i=0;i<filter_height;i++){
+            for(int j=0;j<filter_width;j++){
+                res += input[idx+i*input_width+j] * _filter[i*filter_width+j];
+            }
+        }
+        output[y*image_width+x] = res/35.0;
+    }
+}
+
+__global__ void convolution_kernel(float *output, float *input, int start_y) {
+    unsigned y = blockIdx.y*blockDim.y + threadIdx.y + start_y;
+    unsigned x = blockIdx.x*blockDim.x + threadIdx.x;
+    unsigned idx = y*input_width+x;
+    if(x<image_width && y<image_height){
+        float res = 0.0;
         for(int i=0;i<filter_height;i++){
             for(int j=0;j<filter_width;j++){
                 res += input[idx+i*input_width+j] * _filter[i*filter_width+j];
@@ -96,26 +111,25 @@ kernelTime.start();
     memoryTime.stop();
 
     dim3 threads(block_size_x, block_size_y);
-    const int nstreams = 8;
-    dim3 grid(int(ceilf(image_width/(float)threads.x)), int(ceilf(image_height/(float)threads.y/nstreams)) );
+    const int nstreams = 2;
+    int grid_x = (image_width+threads.x-1)/threads.x;
+    int grid_y = ((image_height+threads.y-1)/threads.y+nstreams-1)/nstreams;
+    dim3 grid(grid_x, grid_y);
     cudaStream_t streams[nstreams];
 
     for(int i=0;i<nstreams;i++){
         cudaStreamCreate(&streams[i]);
-        int start_pos = i*threads.y*int(ceilf(image_height/(float)threads.y/nstreams));
-        int length = threads.y*int(ceilf(image_height/(float)threads.y/nstreams)) + border_height;
+        int start_pos = i*threads.y*grid_y;
+        int length = threads.y*grid_y + border_height;
         if(start_pos+length > input_height) length = input_height - start_pos;
         cudaMemcpyAsync(&d_input[start_pos*input_width], &input[start_pos*input_width], length * input_width * sizeof(float), cudaMemcpyHostToDevice, streams[i]);
-        convolution_kernel_constant<<<grid, threads, 0, streams[i]>>>(&d_output[start_pos*image_width], &d_input[start_pos*input_width]);
-        //cudaMemcpyAsync(&output[start_pos*image_width], &d_output[start_pos*image_width], (length-border_height) * image_width * sizeof(float),cudaMemcpyDeviceToHost, streams[i]);
+        convolution_kernel<<<grid, threads, 0, streams[i]>>>(d_output, d_input, start_pos);
     }
     cudaDeviceSynchronize();
     memoryTime.start();
     cudaMemcpy(output, d_output, image_height*image_width*sizeof(float), cudaMemcpyDeviceToHost);
     memoryTime.stop();
 kernelTime.stop();
-
-
 
 
     err = cudaFree(d_input);
