@@ -61,7 +61,7 @@ void convolutionSeq(image_params* params) {
         }
     }
     sequentialTime.stop();
-    cout << sequentialTime << ",";
+    cout << "CPU(" << params->ratio << "):" << sequentialTime << endl;
 }
 
 __constant__ int d_input_width;
@@ -158,8 +158,8 @@ void convolutionCUDA(image_params *params) {
     if (cudaFree(d_input) != cudaSuccess) { fprintf(stderr, "Error in freeing d_input: %s\n", cudaGetErrorString(err)); }
     if (cudaFree(d_output) != cudaSuccess) { fprintf(stderr, "Error in freeing d_output: %s\n", cudaGetErrorString(err)); }
 
-    cout << memoryTime << ",";
-    cout << kernelTime << ",";
+    cout << "GPU_T(" << 100 - params->ratio << "):" << memoryTime << endl;
+    cout << "GPU_K(" << 100-params->ratio << "):" << kernelTime << endl;
 }
 
 static void usage(const char* pname)
@@ -196,13 +196,12 @@ void read_parameters_f(struct image_params* p, int argc, char** argv)
     p->ratio = p->ratio < 0 ? 0 : p->ratio;
     p->ratio = p->ratio > 100 ? 100 : p->ratio;
 
-    /*printf("Parameters:\n"
+    printf("Parameters:\n"
         "  -n %d # number of rows\n"
         "  -m %d # number of columns\n"
         "  -p %d # GPU work share\n"
         "  -k %d # kernel size\n",
         p->image_h, p->image_w, p->ratio, p->filter_h);
-    */
 }
 
 int main(int argc, char** argv)
@@ -265,13 +264,10 @@ int main(int argc, char** argv)
     ip.input = input;
     ip.output = output;
 
-    timer totalTime = timer("Sequential");
     // Run the mixed model
-    totalTime.start();
-    convolutionSeq(&ip);
     convolutionCUDA(&ip);
-    totalTime.stop();
-    cout << totalTime << endl;
+    convolutionSeq(&ip);
+	cudaDeviceSynchronize();
 
     free(filter);
     free(input);
