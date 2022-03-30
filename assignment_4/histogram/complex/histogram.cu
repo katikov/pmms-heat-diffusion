@@ -186,7 +186,7 @@ int main(int argc, char* argv[]) {
     int c;
     int seed = 42;
     const char *image_path = 0;
-    image_path ="../../images/pat1_100x150.pgm";
+    image_path ="../../../images/pat1_100x150.pgm";
     int gen_image = 0;
     int debug = 0;
 
