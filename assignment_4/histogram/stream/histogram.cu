@@ -113,7 +113,7 @@ __global__ void histogramKernel(unsigned char *image, long img_size, unsigned in
     {
         atomicAdd(&histogram[threadId], shared_histogram[threadId]);
     }
-    __syncthreads();
+//     __syncthreads();
 
 
 }
