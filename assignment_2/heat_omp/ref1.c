@@ -41,6 +41,7 @@ static int fill_report(const struct parameters *p, struct results *r,
     /* We have said that the final reduction does not need to be included. */
     clock_gettime(CLOCK_MONOTONIC, &after);
  
+    # pragma omp parallel for if (!omp_heat_pure_seq) schedule (runtime ) reduction(max : tmax)  reduction(min: tmin) reduction(+: sum)
     for (size_t i = 1; i < h - 1; ++i)
         for (size_t j = 1; j < w - 1; ++j) 
         {

@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <errno.h>
+#include <pthread.h>
+#include <semaphore.h>
 
 void die(const char *msg){
     if (errno != 0) 
@@ -74,8 +76,25 @@ void print_image(int num_rows, int num_cols, int * image){
 	printf("\n");
 }
 
-void histogram(int * histo, int * image){
-    //TODO: For Students
+typedef struct histo_thread_params
+{
+    int* data_start; // start of the sequence chunk
+    int* data_end; // end of the sequence chunk
+    sem_t* histo; // min and max range element values
+} histo_thread_params;
+
+void* histogram(void* tparams){
+    histo_thread_params* params = (histo_thread_params*)tparams;
+    int* image_start = params->data_start;
+    int* image_end = params->data_end;
+    sem_t* histo = params->histo;
+
+    int* iter = image_start;
+    while(iter < image_end) {
+        sem_post(&histo[*iter]);
+        ++iter;
+    }
+    pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[]){
@@ -127,6 +146,8 @@ int main(int argc, char *argv[]){
     }
 
     int * image = (int *) malloc(sizeof(int) * num_cols * num_rows);
+    int* counts = (int*)malloc(sizeof(int) * num_threads);
+    int* image_start = image;
 
     /* Seed such that we can always reproduce the same random vector */
     if (gen_image){
@@ -136,11 +157,35 @@ int main(int argc, char *argv[]){
     	read_image(image_path,num_rows, num_cols, image);
     }
 
+    // Threading Boilerplate
+    pthread_attr_t attr;
+    pthread_attr_init ( &attr ); 
+    pthread_attr_setscope ( &attr , PTHREAD_SCOPE_SYSTEM );
+    histo_thread_params* args = malloc(num_threads * sizeof(*args));
+    pthread_t threads[num_threads];
+    int excess = (num_cols * num_rows) % num_threads;
+    int base = (num_cols * num_rows) / num_threads;
+    for (int i = 0; i < num_threads; ++i) {
+        counts[i] = base + (i < excess?1:0);
+    }
+    // Semaphore Init
+
+    sem_t *sem_histo = malloc(256 * sizeof(sem_t));
+    for (int i = 0; i < 256; ++i) sem_init(&sem_histo[i], 0, 0);
+
     clock_gettime(CLOCK_MONOTONIC, &before);
     /* Do your thing here */
-
-
-    histogram(histo, image);
+    for (int i = 0; i < num_threads; ++i){
+        args[i] = (histo_thread_params){
+            .data_start = image_start,
+            .data_end = image_start + counts[i],
+            .histo = sem_histo
+            };
+        image_start += counts[i];
+        pthread_create(&threads[i], &attr, histogram, (void*)&args[i]);
+        }
+    for (int i = 0; i < num_threads; ++i)
+        pthread_join(threads[i], NULL);
 
     /* Do your thing here */
 
@@ -151,6 +196,7 @@ int main(int argc, char *argv[]){
     clock_gettime(CLOCK_MONOTONIC, &after);
     double time = (double)(after.tv_sec - before.tv_sec) +
                   (double)(after.tv_nsec - before.tv_nsec) / 1e9;
-
+    for (int i = 0; i < 256; ++i)sem_getvalue(&sem_histo[i], &histo[i]);
     printf("Histo took: % .6e seconds \n", time);
+    //print_histo(histo);
 }

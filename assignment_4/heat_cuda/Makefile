@@ -10,9 +10,9 @@ NVCC=nvcc
 INCLUDES=-I../../include
 
 ifndef DEBUG
-CFLAGS=-O2
+CFLAGS=-O3
 LIB=
-NVCCFLAGS=-O2
+NVCCFLAGS=-O3
 else
 CFLAGS=-O0 -g3
 LIB=
